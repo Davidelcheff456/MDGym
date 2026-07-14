@@ -676,6 +676,25 @@ button, input, select {
   border-radius: var(--radius-lg);
   padding: 10px;
 }
+.modal-muscle-icon {
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.block-header {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 18px 0 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.block-header:first-child { margin-top: 4px; }
 
 .howto-gallery {
   display: flex;
@@ -911,19 +930,4 @@ button, input, select {
   gap: 10px;
   background: var(--accent);
   color: var(--accent-text);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  margin-top: 10px;
-  font-weight: 700;
-  font-size: 13px;
-}
-.rest-timer-label { display: flex; align-items: center; gap: 6px; }
-.rest-timer-clock { font-size: 16px; font-weight: 800; margin-left: auto; }
-.rest-timer-bar .btn {
-  width: auto;
-  padding: 6px 10px;
-  font-size: 12px;
-  background: rgba(0,0,0,.15);
-  color: var(--accent-text);
-  border: none;
-}
+  border-rad

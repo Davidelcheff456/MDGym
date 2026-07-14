@@ -113,6 +113,14 @@ function mdgymCombineGoals(goalIds) {
 }
 window.mdgymCombineGoals = mdgymCombineGoals;
 
+// Cada dia se arma en 3 bloques, en este orden fijo: Movilidad (activacion
+// articular antes de entrenar) -> Fuerza (la plantilla especifica del dia,
+// segun el split) -> Cardio (finisher corto). Los slots de movilidad y
+// cardio son bodyweight ("body only"), asi que se arman siempre que el
+// perfil tenga marcado ese equipo, sin importar el split del dia.
+const MDGYM_MOBILITY_SLOTS = [{ muscle: "movilidad", count: 2 }];
+const MDGYM_CARDIO_SLOTS = [{ muscle: "cardio", count: 1 }];
+
 // Plantillas de dia: cada una define slots (musculo + cantidad de
 // ejercicios). El generador reemplaza cada slot por un ejercicio real
 // segun el equipo disponible.
@@ -120,6 +128,7 @@ window.MDGYM_DAY_TEMPLATES = {
   full: {
     label: "Cuerpo completo",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "piernas", count: 2 },
       { muscle: "pecho", count: 1 },
       { muscle: "espalda", count: 1 },
@@ -127,46 +136,57 @@ window.MDGYM_DAY_TEMPLATES = {
       { muscle: "biceps", count: 1 },
       { muscle: "triceps", count: 1 },
       { muscle: "abdominales", count: 1 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
   upper: {
     label: "Tren superior",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "pecho", count: 2 },
       { muscle: "espalda", count: 2 },
       { muscle: "hombros", count: 2 },
       { muscle: "biceps", count: 1 },
       { muscle: "triceps", count: 1 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
   lower: {
     label: "Tren inferior",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "piernas", count: 4 },
       { muscle: "abdominales", count: 2 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
   push: {
     label: "Empuje (Push)",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "pecho", count: 2 },
       { muscle: "hombros", count: 2 },
       { muscle: "triceps", count: 2 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
   pull: {
     label: "Tiron (Pull)",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "espalda", count: 3 },
       { muscle: "biceps", count: 2 },
       { muscle: "antebrazos", count: 1 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
   legs: {
     label: "Piernas",
     slots: [
+      ...MDGYM_MOBILITY_SLOTS,
       { muscle: "piernas", count: 4 },
       { muscle: "abdominales", count: 2 },
+      ...MDGYM_CARDIO_SLOTS,
     ],
   },
 };

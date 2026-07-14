@@ -47,7 +47,7 @@ const MDGymStore = {
   },
 
   getSettings() {
-    return mdgymRead(MDGYM_KEYS.settings, { theme: "oscuro", units: "kg", logo: "barra" });
+    return mdgymRead(MDGYM_KEYS.settings, { theme: "oscuro", units: "kg" });
   },
   saveSettings(s) {
     mdgymWrite(MDGYM_KEYS.settings, s);

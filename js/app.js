@@ -199,7 +199,7 @@ function mdgymApplyChromeIcons() {
   const navHistory = document.getElementById("navicon-history");
   if (navHistory) navHistory.innerHTML = window.mdgymIcon("chart", 19);
   const logoSlot = document.getElementById("topbar-logo");
-  if (logoSlot) logoSlot.innerHTML = window.mdgymLogo(settings.logo || "barra", 24);
+  if (logoSlot) logoSlot.innerHTML = window.mdgymLogo(24);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -257,6 +257,11 @@ function mdgymBuildRoutineExplanationHtml(profile) {
     <div class="section-title">En que nos basamos</div>
     <div class="card">
       <p style="margin:0;">Para elegir los ejercicios de cada dia priorizamos primero los movimientos compuestos (los que trabajan varios musculos a la vez, como sentadillas, remos o press) por sobre los de aislamiento, filtramos solo los que se pueden hacer con el equipo que marcaste, y ajustamos series, repeticiones y descanso segun tu objetivo (ahora mismo ${profile.goalScheme.sets}x${profile.goalScheme.reps}, descanso ~${profile.goalScheme.restSec}s). La cantidad de rutinas posibles es finita: combinamos plantillas fijas de entrenamiento con tu equipo disponible, no es generacion aleatoria ni con IA.</p>
+    </div>
+
+    <div class="section-title">Como se arma cada dia</div>
+    <div class="card">
+      <p style="margin:0;">Cada dia arranca con un bloque corto de <b>movilidad</b> (activacion articular general, para llegar mejor preparado a los ejercicios principales), sigue con el bloque de <b>fuerza</b> especifico de ese dia segun el split, y cierra con un <b>finisher de cardio</b>. Es una estructura general de entrada en calor + trabajo principal + cierre, no una prescripcion medica: si algo no te cae bien, podes sacarlo desde "Editar ejercicios de este dia".</p>
     </div>
 
     <div class="section-title">Beneficios esperados</div>
@@ -846,7 +851,7 @@ function renderOnboardBuildStep(root) {
         .map(
           (ex, exIdx) => `
         <div class="exercise-card" style="align-items:flex-start;">
-          <div class="exercise-thumb"><img src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" loading="lazy" /></div>
+          <div class="exercise-thumb">${mdgymExerciseThumbHtml(ex)}</div>
           <div class="exercise-info" style="width:100%;">
             <div class="exercise-name">${ex.name_es}</div>
             <div class="exercise-meta">${ex.equipment_es} &middot; ${capitalize(ex.muscle_group)}</div>
@@ -1163,8 +1168,22 @@ function renderHome() {
 
   const isEditingDay = STATE.editingDayIdx === dayIdx;
 
+  // Bloques: si el dia tiene ejercicios de mas de un bloque (movilidad,
+  // fuerza, cardio), agrupamos visualmente con un encabezado cada vez que
+  // cambia el bloque respecto al ejercicio anterior (rutinas manuales,
+  // donde todo es "fuerza", no muestran ningun encabezado).
+  const dayBlocks = day.exercises.map((ex) => mdgymExerciseBlock(ex));
+  const showBlockHeaders = new Set(dayBlocks).size > 1;
+  let lastBlockSeen = null;
+
   const exCards = day.exercises
     .map((ex) => {
+      const exBlock = mdgymExerciseBlock(ex);
+      const blockHeaderHtml =
+        showBlockHeaders && exBlock !== lastBlockSeen
+          ? `<div class="block-header block-${exBlock}">${MDGYM_BLOCK_LABELS[exBlock]}</div>`
+          : "";
+      lastBlockSeen = exBlock;
       // series/reps/descanso: si el ejercicio tiene sus propios valores
       // (rutina manual, o uno agregado a mano), se usan esos; si no, se usa
       // el esquema general segun el/los objetivo(s) elegidos (rutina armada
@@ -1223,8 +1242,9 @@ function renderHome() {
         : "";
 
       return `
+        ${blockHeaderHtml}
         <div class="exercise-card" style="align-items:flex-start;">
-          <div class="exercise-thumb" data-detail="${ex.id}"><img src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" loading="lazy" /></div>
+          <div class="exercise-thumb" data-detail="${ex.id}">${mdgymExerciseThumbHtml(ex)}</div>
           <div class="exercise-info" style="width:100%;">
             <div class="exercise-name" data-detail="${ex.id}">${ex.name_es}</div>
             <div class="exercise-meta">${ex.equipment_es} · ${capitalize(ex.muscle_group)}${lastLabel ? ` · ultima vez: ${lastLabel}` : ""}</div>
@@ -1479,7 +1499,7 @@ function openExerciseDetail(exerciseId) {
         .slice(0, 3)
         .map((src) => `<img src="${src}" alt="${ex.name_es}" loading="lazy" />`)
         .join("")}</div>`
-    : `<div class="howto-empty">Todavia no tenemos fotos de ejecucion para este ejercicio. Guiate por el musculo marcado y la descripcion de abajo.</div>`;
+    : `<div class="howto-empty">Todavia no tenemos fotos de ejecucion para este ejercicio. Guiate por la descripcion de abajo.</div>`;
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -1492,7 +1512,7 @@ function openExerciseDetail(exerciseId) {
         </div>
         <button class="icon-btn" id="btn-close-detail" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
       </div>
-      <img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />
+      ${mdgymExerciseModalVisualHtml(ex)}
       ${gallery}
       <div class="modal-instructions">${ex.instructions_es || ""}</div>
       <div id="exercise-progress-section"></div>
@@ -1645,6 +1665,47 @@ function openWeeklyWrapModal() {
 
 function capitalize(s) {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ------------------------------------------------------------
+// Bloques del dia: cada dia generado por el asistente arranca con
+// movilidad (activacion articular), sigue con la fuerza especifica
+// de la plantilla del dia, y cierra con un finisher de cardio. El
+// bloque es una funcion pura del muscle_group del ejercicio (no
+// hace falta guardar el bloque en el perfil): "movilidad" y "cardio"
+// son sus propios muscle_group, cualquier otro cae en "fuerza".
+// ------------------------------------------------------------
+const MDGYM_BLOCK_LABELS = { movilidad: "Movilidad", fuerza: "Fuerza", cardio: "Cardio" };
+function mdgymExerciseBlock(ex) {
+  if (ex.muscle_group === "movilidad") return "movilidad";
+  if (ex.muscle_group === "cardio") return "cardio";
+  return "fuerza";
+}
+
+// Para movilidad/cardio no tenemos un diagrama muscular real (no son un
+// musculo puntual sino un tipo de movimiento), asi que en vez de una foto
+// mostramos un icono generico coherente con el resto de la interfaz.
+function mdgymMuscleGroupIcon(muscleGroup) {
+  if (muscleGroup === "movilidad") return "stretch";
+  if (muscleGroup === "cardio") return "heartbeat";
+  return null;
+}
+
+// HTML para el thumbnail chico (card de ejercicio, 64x64).
+function mdgymExerciseThumbHtml(ex, size) {
+  const iconName = mdgymMuscleGroupIcon(ex.muscle_group);
+  return iconName
+    ? window.mdgymIcon(iconName, size || 30)
+    : `<img src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" loading="lazy" />`;
+}
+
+// HTML para la imagen grande del modal de detalle (reemplaza el <img> de
+// diagrama muscular por un icono centrado del mismo tamaño cuando no aplica).
+function mdgymExerciseModalVisualHtml(ex) {
+  const iconName = mdgymMuscleGroupIcon(ex.muscle_group);
+  return iconName
+    ? `<div class="modal-muscle-img modal-muscle-icon">${window.mdgymIcon(iconName, 56)}</div>`
+    : `<img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />`;
 }
 
 function finishDay(profile, day, dayIdx) {
@@ -2083,17 +2144,6 @@ function renderSettings() {
     )
     .join("");
 
-  const logoIds = Object.keys(window.MDGYM_LOGO_LABELS || {});
-  const logoSwatches = logoIds
-    .map(
-      (id) => `
-      <div class="logo-swatch ${settings.logo === id || (!settings.logo && id === "barra") ? "selected" : ""}" data-logo-choice="${id}">
-        ${window.mdgymLogo(id, 30)}
-        <span class="lbl2">${window.MDGYM_LOGO_LABELS[id]}</span>
-      </div>`
-    )
-    .join("");
-
   let profileSection = "";
   if (profile) {
     const isManualProfile = profile.mode === "manual";
@@ -2215,12 +2265,6 @@ function renderSettings() {
       <div class="theme-grid">${themeSwatches}</div>
     </div>
 
-    <div class="section-title">Logo</div>
-    <div class="card">
-      <p class="note" style="margin-top:0;">Se muestra siempre arriba, junto al nombre de la app.</p>
-      <div class="logo-grid">${logoSwatches}</div>
-    </div>
-
     ${profileSection}
 
     <div class="section-title">Datos</div>
@@ -2246,17 +2290,6 @@ function renderSettings() {
       document.documentElement.setAttribute("data-theme", id);
       const s = MDGymStore.getSettings();
       s.theme = id;
-      MDGymStore.saveSettings(s);
-      mdgymApplyChromeIcons();
-      renderSettings();
-    })
-  );
-
-  root.querySelectorAll("[data-logo-choice]").forEach((sw) =>
-    sw.addEventListener("click", () => {
-      const id = sw.dataset.logoChoice;
-      const s = MDGymStore.getSettings();
-      s.logo = id;
       MDGymStore.saveSettings(s);
       mdgymApplyChromeIcons();
       renderSettings();
@@ -2296,6 +2329,7 @@ function renderSettings() {
     alert("Datos actualizados.");
     renderSettings();
   });
+
 
   const saveGoalsBtn = document.getElementById("btn-save-goals");
   if (saveGoalsBtn) {
@@ -2345,7 +2379,6 @@ function renderSettings() {
   if (rotateBtn) {
     rotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
-      p.weekIndex = (p.weekIndex || 0) + 1;
       p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();

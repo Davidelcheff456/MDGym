@@ -21,6 +21,8 @@ const MDGYM_UI_ICONS = {
   shuffle: '<path d="M4 7h3.5L15 17h4.5" /><path d="M16.5 4.5 20.5 7l-4 2.5" /><path d="M4 17h3.5l2-3" /><path d="M11 10l1.3-2" /><path d="M16.5 19.5 20.5 17l-4-2.5" />',
   box: '<path d="M3.5 8 12 4l8.5 4-8.5 4-8.5-4Z" /><path d="M3.5 8v8L12 20l8.5-4V8" /><path d="M12 12v8" />',
   tip: '<path d="M9 18.5h6" /><path d="M10 21.5h4" /><path d="M12 3a6.3 6.3 0 0 0-3.6 11.4c.7.5 1.1 1.3 1.1 2.1h5c0-.8.4-1.6 1.1-2.1A6.3 6.3 0 0 0 12 3Z" />',
+  stretch: '<circle cx="12" cy="4.5" r="2"/><path d="M12 6.5v5.5"/><path d="M12 9l-4.5 2"/><path d="M12 8l5-3.5"/><path d="M12 12l-3 7"/><path d="M12 12l4 7"/>',
+  heartbeat: '<path d="M3 12h3l2-5 3 10 2-8 1.5 3H21"/>',
 };
 
 // ------------------------------------------------------------
@@ -72,36 +74,37 @@ function mdgymIcon(name, size, strokeWidth) {
 }
 
 // ------------------------------------------------------------
-// Logo: 5 variantes seleccionables (ver Configuracion). Se
-// dibujan como una placa cuadrada con el color de acento del
-// tema activo, siguiendo la misma estetica del favicon actual.
+// Logo: UNA sola marca fija (no seleccionable por el usuario),
+// escudo con una barra de pesas adentro. Se dibuja como una placa
+// cuadrada con el color de acento del tema activo, igual que el
+// favicon. Al igual que los 19 iconos de arriba, el logo tambien
+// recibe el "tratamiento" propio de cada uno de los 4 temas nuevos
+// (grosor/terminacion de trazo, redondeo de la placa y el mismo
+// detalle decorativo en la esquina), asi cambia de personalidad
+// junto con el resto de la interfaz en vez de quedar estatico.
 // ------------------------------------------------------------
-const MDGYM_LOGOS = {
-  barra:
-    '<path d="M4 12h16M6 9v6M18 9v6"/><rect x="3" y="9.5" width="2.2" height="5" rx="0.6" fill="var(--accent-text)" stroke="none"/><rect x="18.8" y="9.5" width="2.2" height="5" rx="0.6" fill="var(--accent-text)" stroke="none"/>',
-  monograma: '<path d="M4 18V6l4 6 4-6 4 6 4-6v12"/>',
-  brazo:
-    '<circle cx="12" cy="12" r="8.5" stroke-width="1.4"/><path d="M8 16c0-3 1-4.5 2.3-5.6"/><path d="M10.3 10.4c-.9-.9-.9-2.2-.1-3 .8-.8 2-.7 2.8.1l2.6 2.6c.8.8.9 2 .1 2.8-.8.8-2.1.8-3-.1"/><path d="M15.5 12.5 17 14"/>',
-  pulso:
-    '<rect x="3.5" y="10.5" width="2" height="3" rx="0.5" fill="var(--accent-text)" stroke="none"/><rect x="18.5" y="10.5" width="2" height="3" rx="0.5" fill="var(--accent-text)" stroke="none"/><path d="M5.5 12h2M16.5 12h2M7.5 12h1.5l1.2-3.2 2 6.4 1.2-3.2H15"/>',
-  escudo:
-    '<path d="M12 3.2 19 5.5v5.3c0 4.6-2.9 7.9-7 9-4.1-1.1-7-4.4-7-9V5.5Z" stroke-width="1.4"/><path d="M8.5 12h7M9.7 9.5v5M14.3 9.5v5"/>',
-};
+const MDGYM_LOGO_INNER =
+  '<path d="M12 3.2 19 5.5v5.3c0 4.6-2.9 7.9-7 9-4.1-1.1-7-4.4-7-9V5.5Z" stroke-width="1.4"/><path d="M7.3 12h9.4M9.3 10v4M14.7 10v4"/><rect x="6.1" y="10.2" width="1.7" height="3.6" rx="0.5" fill="var(--accent-text)" stroke="none"/><rect x="16.2" y="10.2" width="1.7" height="3.6" rx="0.5" fill="var(--accent-text)" stroke="none"/>';
 
-const MDGYM_LOGO_LABELS = {
-  barra: "Barra minimal",
-  monograma: "Monograma M",
-  brazo: "Brazo en circulo",
-  pulso: "Barra con pulso",
-  escudo: "Escudo",
-};
-
-function mdgymLogo(id, size) {
+function mdgymLogo(size) {
   size = size || 26;
-  const inner = MDGYM_LOGOS[id] || MDGYM_LOGOS.barra;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="7" fill="var(--accent)"/><g fill="none" stroke="var(--accent-text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</g></svg>`;
+  const theme =
+    (typeof document !== "undefined" && document.documentElement.getAttribute("data-theme")) || "oscuro";
+  const style = MDGYM_ICON_THEME_STYLE[theme];
+  let inner = MDGYM_LOGO_INNER;
+  let sw = 2;
+  let cap = "round";
+  let join = "round";
+  let rx = 7;
+  if (style) {
+    rx = Math.min(rx * style.rxScale, 10).toFixed(2);
+    sw = style.strokeWidth;
+    cap = style.linecap;
+    join = style.linejoin;
+    inner = inner + (MDGYM_ICON_ACCENTS[style.accent] || "");
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true"><rect width="24" height="24" rx="${rx}" fill="var(--accent)"/><g fill="none" stroke="var(--accent-text)" stroke-width="${sw}" stroke-linecap="${cap}" stroke-linejoin="${join}">${inner}</g></svg>`;
 }
 
 window.mdgymIcon = mdgymIcon;
 window.mdgymLogo = mdgymLogo;
-window.MDGYM_LOGO_LABELS = MDGYM_LOGO_LABELS;
