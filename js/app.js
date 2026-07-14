@@ -41,6 +41,7 @@ const STATE = {
   editingDayIdx: null, // != null mientras se estan editando (sacando) ejercicios de ese dia en Rutina
   homeSuggestion: null, // { dayIdx, suggestion } sugerencia de reemplazo tras sacar un ejercicio en Rutina
   monthViewOffset: 0, // 0 = mes actual, -1 = mes anterior, 1 = mes siguiente, etc. (vista Mes)
+  dismissedMissing: new Set(), // avisos de "falta equipo para X" ya cerrados (clave: dayIdx + lista de musculos faltantes)
 };
 
 function todayISO() {
@@ -434,9 +435,21 @@ function renderOnboarding() {
       groups[eq.group] = groups[eq.group] || [];
       groups[eq.group].push(eq);
     });
+    const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[STATE.onboardData.location]) || [];
+    const presetsHtml = presets.length
+      ? `
+      <div class="equip-group-title">Atajos rapidos</div>
+      <div class="chip-group" id="equip-presets">
+        ${presets.map((p) => `<div class="chip" data-equip-preset="${p.id}">${p.label}</div>`).join("")}
+      </div>
+      <p class="note" style="margin-top:-2px; margin-bottom:12px;">Tocando un atajo se marca esa seleccion, y despues la podes seguir ajustando a mano abajo.</p>
+      `
+      : "";
     body = `
       <div class="onboard-title">¿Que equipo tenes?</div>
       <div class="onboard-sub">${STATE.onboardData.location === "home" ? "Objetos que tengas en tu casa." : "En tu gym."} Tocá todo lo que tengas disponible.</div>
+      ${presetsHtml}
+      <div class="equip-group-title">${presets.length ? "O elegi manualmente" : ""}</div>
       ${Object.keys(groups)
         .map(
           (gname) => `
@@ -523,6 +536,19 @@ function renderOnboarding() {
         if (i >= 0) STATE.onboardData.equipment.splice(i, 1);
         else STATE.onboardData.equipment.push(id);
         c.classList.toggle("selected");
+      })
+    );
+    root.querySelectorAll("[data-equip-preset]").forEach((c) =>
+      c.addEventListener("click", () => {
+        const presetId = c.dataset.equipPreset;
+        const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[STATE.onboardData.location]) || [];
+        const preset = presets.find((p) => p.id === presetId);
+        if (!preset) return;
+        // "Gimnasio completo" no trae una lista fija: es todo el catalogo
+        // disponible para esa ubicacion en este momento.
+        const list = preset.equipment || mdgymEquipmentForLocation(STATE.onboardData.location).map((eq) => eq.id);
+        STATE.onboardData.equipment = [...list];
+        renderOnboarding();
       })
     );
   }
@@ -1172,9 +1198,17 @@ function renderHome() {
 
   const editToggleHtml = `<button class="btn btn-secondary" id="btn-toggle-edit" style="margin:12px 0 4px;">${isEditingDay ? "Listo" : "Editar ejercicios de este dia"}</button>`;
 
-  const missingNote = day.missing.length
-    ? `<p class="note" style="color:var(--danger);">⚠ Con tu equipo actual no encontramos ejercicio para: ${day.missing.join(", ")}. Sumá mas equipo (por ejemplo "Objetos varios") en Configuracion para completar este dia.</p>`
-    : "";
+  // clave por dia + lista de musculos faltantes: si cambia el equipo y
+  // aparece una situacion de "falta X" distinta, se vuelve a mostrar aunque
+  // ya hayas cerrado un aviso anterior para ese mismo dia.
+  const missingKey = `${dayIdx}:${day.missing.join(",")}`;
+  const missingNote =
+    day.missing.length && !STATE.dismissedMissing.has(missingKey)
+      ? `<div class="suggest-card" id="missing-note">
+          <p>⚠ Con tu equipo actual no encontramos ejercicio para: ${day.missing.join(", ")}. Sumá mas equipo (por ejemplo "Objetos varios") en Configuracion para completar este dia.</p>
+          <div class="btn-row"><button class="btn btn-secondary" id="btn-dismiss-missing" style="flex:1;">Entendido</button></div>
+        </div>`
+      : "";
 
   root.innerHTML = `
     <div class="day-pill-row">${pillsRow}</div>
@@ -1262,6 +1296,14 @@ function renderHome() {
   });
   const skipRestBtn = document.getElementById("btn-skip-rest");
   if (skipRestBtn) skipRestBtn.addEventListener("click", mdgymStopRestTimer);
+
+  const dismissMissingBtn = document.getElementById("btn-dismiss-missing");
+  if (dismissMissingBtn) {
+    dismissMissingBtn.addEventListener("click", () => {
+      STATE.dismissedMissing.add(missingKey);
+      renderHome();
+    });
+  }
 
   root.querySelectorAll("[data-detail]").forEach((el) =>
     el.addEventListener("click", () => openExerciseDetail(el.dataset.detail))

@@ -46,6 +46,47 @@ window.MDGYM_EQUIPMENT_CATALOG = [
   { id: "other", label: "Objetos varios / caseros", group: "Accesorios", icon: "bag" },
 ];
 
+// ------------------------------------------------------------
+// Atajos de equipamiento: en vez de tildar maquina por maquina, se puede
+// arrancar de un preset y despues seguir ajustando a mano (los presets
+// solo pre-tildan la checklist, no reemplazan la seleccion manual).
+// ------------------------------------------------------------
+window.MDGYM_EQUIPMENT_PRESETS = {
+  gym: [
+    {
+      id: "gym_full",
+      label: "Gimnasio completo",
+      note: "Tilda todo el catalogo: maquinas, poleas, pesas libres y accesorios.",
+      // se calcula en runtime con mdgymEquipmentForLocation("gym") (todo el catalogo)
+    },
+    {
+      id: "gym_basic",
+      label: "Gimnasio basico",
+      note: "Un gym chico tipico: pesas libres + un par de maquinas y poleas comunes.",
+      equipment: [
+        "body only", "dumbbell", "barbell", "kettlebells",
+        "machine_leg_press", "machine_chest_press", "machine_shoulder_press",
+        "cable_lat_pulldown", "cable_seated_row", "cable_triceps_pushdown",
+        "bands",
+      ],
+    },
+  ],
+  home: [
+    {
+      id: "home_some",
+      label: "Algunos aparatos",
+      note: "Peso corporal + mancuernas, bandas y una pelota de estabilidad.",
+      equipment: ["body only", "dumbbell", "bands", "exercise ball", "other"],
+    },
+    {
+      id: "home_none",
+      label: "Ninguno (solo cuerpo)",
+      note: "Solo ejercicios de peso corporal, sin ningun equipo.",
+      equipment: ["body only"],
+    },
+  ],
+};
+
 // Objetivos combinables. sets/reps/rest son de referencia general
 // (rangos habituales de entrenamiento de fuerza), no una prescripcion
 // medica individual.
