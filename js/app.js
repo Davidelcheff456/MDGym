@@ -42,6 +42,7 @@ const STATE = {
   homeSuggestion: null, // { dayIdx, suggestion } sugerencia de reemplazo tras sacar un ejercicio en Rutina
   monthViewOffset: 0, // 0 = mes actual, -1 = mes anterior, 1 = mes siguiente, etc. (vista Mes)
   dismissedMissing: new Set(), // avisos de "falta equipo para X" ya cerrados (clave: dayIdx + lista de musculos faltantes)
+  equipmentPickMode: null, // null = mostrar los atajos (completo/basico/etc); "manual" = mostrar la checklist maquina por maquina
 };
 
 function todayISO() {
@@ -350,6 +351,66 @@ function renderOnboarding() {
     return;
   }
 
+  // Paso "equipment", pantalla de atajos: en vez de obligar a tildar
+  // maquina por maquina, primero se elige entre un par de presets
+  // (gimnasio completo/basico, o algunos aparatos/ninguno en casa) o
+  // "elegir manualmente". Elegir un preset avanza directo al paso
+  // siguiente (no hace falta pasar por la checklist). Solo si se elige
+  // "manualmente" se muestra la checklist de siempre (mas abajo, dentro
+  // del bloque de pasos con footer generico).
+  if (step === "equipment" && STATE.equipmentPickMode !== "manual") {
+    const location = STATE.onboardData.location;
+    const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[location]) || [];
+    const manualLabel = location === "home" ? "Elegir lo que tengo, uno por uno" : "Elegir maquina por maquina";
+    root.innerHTML = `
+      <div class="onboard-title">¿Que equipo tenes?</div>
+      <div class="onboard-sub">Elegi un atajo, o segui uno por uno si preferis ser especifico.</div>
+      ${presets
+        .map(
+          (p) => `
+        <div class="card" data-equip-preset="${p.id}" style="cursor:pointer;">
+          <div class="card-title" style="margin-bottom:6px; text-transform:none; letter-spacing:0; font-size:15px; color:var(--text);">${p.label}</div>
+          <p style="margin:0; font-size:13.5px; color:var(--text-muted); line-height:1.5;">${p.note}</p>
+        </div>`
+        )
+        .join("")}
+      <div class="card" data-equip-preset="manual" style="cursor:pointer;">
+        <div class="card-title" style="margin-bottom:6px; text-transform:none; letter-spacing:0; font-size:15px; color:var(--text);">${manualLabel}</div>
+        <p style="margin:0; font-size:13.5px; color:var(--text-muted); line-height:1.5;">Tildas exactamente lo que tenes, equipo por equipo.</p>
+      </div>
+      <div class="btn-row" style="margin-top:10px;">
+        <button class="btn btn-secondary" id="ob-equip-back">Atras</button>
+      </div>
+    `;
+    root.querySelectorAll("[data-equip-preset]").forEach((c) =>
+      c.addEventListener("click", () => {
+        const presetId = c.dataset.equipPreset;
+        if (presetId === "manual") {
+          STATE.equipmentPickMode = "manual";
+          renderOnboarding();
+          return;
+        }
+        const preset = presets.find((p) => p.id === presetId);
+        if (!preset) return;
+        // "Gimnasio completo" no trae una lista fija: es todo el catalogo
+        // disponible para esa ubicacion en este momento.
+        const list = preset.equipment || mdgymEquipmentForLocation(location).map((eq) => eq.id);
+        STATE.onboardData.equipment = [...list];
+        const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode);
+        const idxNow = stepsNow.indexOf("equipment");
+        STATE.onboardStep = stepsNow[idxNow + 1];
+        renderOnboarding();
+      })
+    );
+    document.getElementById("ob-equip-back").addEventListener("click", () => {
+      const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode);
+      const idxNow = stepsNow.indexOf("equipment");
+      STATE.onboardStep = stepsNow[idxNow - 1];
+      renderOnboarding();
+    });
+    return;
+  }
+
   // Paso "build": constructor manual, dia por dia. Footer propio.
   if (step === "build") {
     renderOnboardBuildStep(root);
@@ -435,21 +496,10 @@ function renderOnboarding() {
       groups[eq.group] = groups[eq.group] || [];
       groups[eq.group].push(eq);
     });
-    const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[STATE.onboardData.location]) || [];
-    const presetsHtml = presets.length
-      ? `
-      <div class="equip-group-title">Atajos rapidos</div>
-      <div class="chip-group" id="equip-presets">
-        ${presets.map((p) => `<div class="chip" data-equip-preset="${p.id}">${p.label}</div>`).join("")}
-      </div>
-      <p class="note" style="margin-top:-2px; margin-bottom:12px;">Tocando un atajo se marca esa seleccion, y despues la podes seguir ajustando a mano abajo.</p>
-      `
-      : "";
     body = `
       <div class="onboard-title">¿Que equipo tenes?</div>
       <div class="onboard-sub">${STATE.onboardData.location === "home" ? "Objetos que tengas en tu casa." : "En tu gym."} Tocá todo lo que tengas disponible.</div>
-      ${presetsHtml}
-      <div class="equip-group-title">${presets.length ? "O elegi manualmente" : ""}</div>
+      <button type="button" class="btn btn-secondary" id="ob-equip-shortcuts" style="margin-bottom:14px; width:auto; padding:8px 12px; font-size:12.5px;">← Volver a los atajos</button>
       ${Object.keys(groups)
         .map(
           (gname) => `
@@ -538,19 +588,13 @@ function renderOnboarding() {
         c.classList.toggle("selected");
       })
     );
-    root.querySelectorAll("[data-equip-preset]").forEach((c) =>
-      c.addEventListener("click", () => {
-        const presetId = c.dataset.equipPreset;
-        const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[STATE.onboardData.location]) || [];
-        const preset = presets.find((p) => p.id === presetId);
-        if (!preset) return;
-        // "Gimnasio completo" no trae una lista fija: es todo el catalogo
-        // disponible para esa ubicacion en este momento.
-        const list = preset.equipment || mdgymEquipmentForLocation(STATE.onboardData.location).map((eq) => eq.id);
-        STATE.onboardData.equipment = [...list];
+    const shortcutsBtn = document.getElementById("ob-equip-shortcuts");
+    if (shortcutsBtn) {
+      shortcutsBtn.addEventListener("click", () => {
+        STATE.equipmentPickMode = null;
         renderOnboarding();
-      })
-    );
+      });
+    }
   }
   if (step === "days") {
     root.querySelectorAll("[data-days]").forEach((c) =>
@@ -563,7 +607,11 @@ function renderOnboarding() {
   }
 
   const backBtn = document.getElementById("ob-back");
-  if (backBtn) backBtn.addEventListener("click", () => { STATE.onboardStep = steps[idx - 1]; renderOnboarding(); });
+  if (backBtn) backBtn.addEventListener("click", () => {
+    STATE.onboardStep = steps[idx - 1];
+    if (STATE.onboardStep === "equipment") STATE.equipmentPickMode = null;
+    renderOnboarding();
+  });
 
   document.getElementById("ob-next").addEventListener("click", () => onboardNext());
 }
@@ -620,6 +668,9 @@ function onboardNext() {
   const steps = mdgymOnboardSteps(mode);
   const idx = steps.indexOf(step);
   STATE.onboardStep = steps[idx + 1];
+  // al llegar de nuevo al paso de equipo (por ejemplo, volviendo desde
+  // "location") se vuelve a mostrar la pantalla de atajos primero.
+  if (STATE.onboardStep === "equipment") STATE.equipmentPickMode = null;
   renderOnboarding();
 }
 
