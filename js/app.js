@@ -31,7 +31,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 const STATE = {
-  onboardStep: "mode",
+  onboardStep: "welcome",
   onboardData: { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], daysPerWeek: 3 },
   previewRoutine: null, // rutina propuesta por el asistente, pendiente de confirmar/ajustar
   onboardAdjustMode: false, // dentro del paso "review": false = viendo la propuesta, true = tildando que sacar
@@ -43,6 +43,7 @@ const STATE = {
   monthViewOffset: 0, // 0 = mes actual, -1 = mes anterior, 1 = mes siguiente, etc. (vista Mes)
   dismissedMissing: new Set(), // avisos de "falta equipo para X" ya cerrados (clave: dayIdx + lista de musculos faltantes)
   equipmentPickMode: null, // null = mostrar los atajos (completo/basico/etc); "manual" = mostrar la checklist maquina por maquina
+  pendingSharedRoutine: null, // != null mientras se completan los datos personales tras abrir un archivo de rutina compartida
 };
 
 function todayISO() {
@@ -302,6 +303,158 @@ function openRoutineExplanationModal(profile) {
 }
 
 // ============================================================
+// RESPALDO (exportar/recuperar todos mis datos) Y COMPARTIR RUTINA
+// Como MDGym no tiene cuenta ni nube (todo vive en el localStorage de
+// este navegador), la unica forma de no perder los datos al cambiar de
+// dispositivo, borrar el cache, o abrir la app desde otra direccion
+// (ej: archivo local vs GitHub Pages, que son "origenes" distintos para
+// el navegador) es exportarlos a un archivo y poder recuperarlos desde
+// ese mismo archivo despues. "Compartir rutina" es un archivo mas chico,
+// pensado para pasarle a otra persona SOLO la rutina (sin datos
+// personales ni historial).
+// ============================================================
+const MDGYM_BACKUP_VERSION = 1;
+const MDGYM_ROUTINE_SHARE_VERSION = 1;
+
+function mdgymBuildBackupPayload() {
+  return {
+    mdgymBackup: true,
+    version: MDGYM_BACKUP_VERSION,
+    exportedAt: new Date().toISOString(),
+    profile: MDGymStore.getProfile(),
+    sessions: MDGymStore.getSessions(),
+    bodyLog: MDGymStore.getBodyLog(),
+    settings: MDGymStore.getSettings(),
+  };
+}
+
+// Restaura un respaldo completo (perfil + historial + medidas +
+// configuracion) previamente exportado desde Configuracion o desde la
+// pantalla de bienvenida. Devuelve {ok:true} o {ok:false, error}.
+function mdgymRestoreBackupPayload(data) {
+  if (!data || typeof data !== "object" || !data.mdgymBackup || !data.profile) {
+    return { ok: false, error: "El archivo no es un respaldo valido de MDGym." };
+  }
+  MDGymStore.saveProfile(data.profile);
+  MDGymStore.saveSessions(Array.isArray(data.sessions) ? data.sessions : []);
+  MDGymStore.saveBodyLog(Array.isArray(data.bodyLog) ? data.bodyLog : []);
+  MDGymStore.saveSettings(data.settings && typeof data.settings === "object" ? data.settings : { theme: "oscuro", units: "kg" });
+  return { ok: true };
+}
+
+// Arma un archivo para COMPARTIR: solo la rutina y lo necesario para
+// reconstruirla (modo, dias, ubicacion, equipo, objetivo). A proposito
+// NO incluye nombre/edad/peso/altura/historial de quien la comparte.
+function mdgymBuildRoutineSharePayload(profile) {
+  return {
+    mdgymRoutineShare: true,
+    version: MDGYM_ROUTINE_SHARE_VERSION,
+    exportedAt: new Date().toISOString(),
+    mode: profile.mode,
+    daysPerWeek: profile.daysPerWeek,
+    location: profile.location,
+    equipment: profile.equipment,
+    goals: profile.goals || [],
+    goalScheme: profile.goalScheme,
+    routine: profile.routine,
+  };
+}
+
+function mdgymIsRoutineShareFile(data) {
+  return !!(data && typeof data === "object" && data.mdgymRoutineShare && Array.isArray(data.routine));
+}
+
+// Aplica una rutina compartida a un perfil YA EXISTENTE: mantiene
+// nombre/edad/peso/altura/historial de quien la importa, reemplaza solo
+// la rutina/objetivo/equipo/dias/modo. Devuelve {ok:true} o {ok:false, error}.
+function mdgymApplySharedRoutineToProfile(sharedData, currentProfile) {
+  if (!mdgymIsRoutineShareFile(sharedData)) {
+    return { ok: false, error: "El archivo no es una rutina compartida valida de MDGym." };
+  }
+  const p = { ...currentProfile };
+  p.mode = sharedData.mode || "assistant";
+  p.daysPerWeek = sharedData.daysPerWeek;
+  p.location = sharedData.location;
+  p.equipment = sharedData.equipment || [];
+  p.goals = sharedData.goals || [];
+  p.goalScheme = sharedData.goalScheme || window.mdgymCombineGoals(sharedData.goals || []);
+  p.routine = sharedData.routine;
+  p.weekIndex = 0;
+  p.nextDayIndex = 0;
+  p.lastRotationDate = todayISO();
+  p.rotationDismissedUntil = null;
+  MDGymStore.saveProfile(p);
+  return { ok: true };
+}
+
+// Arma un perfil NUEVO a partir de datos personales minimos (cargados en
+// el paso "personal" del onboarding) + una rutina compartida, para cuando
+// quien importa todavia no tiene perfil propio.
+function mdgymBuildProfileFromSharedRoutine(personalData, sharedData) {
+  const composition = MDGymCalc.estimateBodyComposition(personalData.weightKg, personalData.heightCm, personalData.sex);
+  return {
+    name: personalData.name || "",
+    age: personalData.age,
+    sex: personalData.sex,
+    weightKg: personalData.weightKg,
+    heightCm: personalData.heightCm,
+    mode: sharedData.mode || "assistant",
+    location: sharedData.location,
+    goals: sharedData.goals || [],
+    equipment: sharedData.equipment || [],
+    daysPerWeek: sharedData.daysPerWeek,
+    goalScheme: sharedData.goalScheme || window.mdgymCombineGoals(sharedData.goals || []),
+    weekIndex: 0,
+    routine: sharedData.routine,
+    nextDayIndex: 0,
+    startWeightKg: personalData.weightKg,
+    startComposition: composition,
+    startDate: todayISO(),
+    lastRotationDate: todayISO(),
+    rotationDismissedUntil: null,
+    weeklyTipIndex: 0,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// Descarga un objeto como archivo .json. Funciona en un navegador real;
+// separado de la logica de armar los datos (que si se puede testear sin
+// navegador) porque URL.createObjectURL puede no estar disponible en
+// entornos de test.
+function mdgymDownloadJson(filename, dataObj) {
+  try {
+    const blob = new Blob([JSON.stringify(dataObj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    alert("No se pudo descargar el archivo en este navegador.");
+  }
+}
+
+// Lee un archivo elegido por el usuario (input type=file) como JSON.
+// onLoad(dataObj) se llama si se pudo parsear; onError(msg) si no.
+function mdgymReadJsonFile(file, onLoad, onError) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      onLoad(data);
+    } catch (e) {
+      onError("El archivo no es un JSON valido.");
+    }
+  };
+  reader.onerror = () => onError("No se pudo leer el archivo.");
+  reader.readAsText(file);
+}
+
+// ============================================================
 // ONBOARDING
 // ============================================================
 
@@ -330,6 +483,73 @@ function renderOnboarding() {
   const root = document.getElementById("onboard-content");
   const step = STATE.onboardStep;
   const mode = STATE.onboardData.mode;
+
+  // Paso "welcome": primera pantalla que ve alguien sin perfil guardado
+  // (primera vez, o porque perdio sus datos al cambiar de navegador,
+  // borrar el cache, o abrir la app desde otra direccion). Como MDGym no
+  // tiene cuenta ni nube, la unica forma de "recuperar" algo es desde un
+  // archivo exportado antes. No usa el footer generico.
+  if (step === "welcome") {
+    root.innerHTML = `
+      <div class="onboard-title">Bienvenido a MDGym</div>
+      <div class="onboard-sub">MDGym no tiene cuenta ni nube: todo se guarda solo en este navegador. Si ya tenias datos y los perdiste, o si alguien te paso su rutina, podes recuperarlos desde un archivo aca.</div>
+      <div class="card" data-welcome="recover" style="cursor:pointer;">
+        <div class="card-title" style="margin-bottom:6px; text-transform:none; letter-spacing:0; font-size:15px; color:var(--text);">Recuperar mis datos</div>
+        <p style="margin:0; font-size:13.5px; color:var(--text-muted); line-height:1.5;">Subi un archivo de respaldo (.json) que hayas exportado antes desde Configuracion, para volver a tener tu perfil, rutina e historial tal como estaban.</p>
+      </div>
+      <div class="card" data-welcome="shared" style="cursor:pointer;">
+        <div class="card-title" style="margin-bottom:6px; text-transform:none; letter-spacing:0; font-size:15px; color:var(--text);">Abrir una rutina compartida</div>
+        <p style="margin:0; font-size:13.5px; color:var(--text-muted); line-height:1.5;">Alguien te paso un archivo con su rutina (.json). Subilo aca: despues te pedimos tus datos personales y armamos tu perfil con esa rutina.</p>
+      </div>
+      <div class="card" data-welcome="new" style="cursor:pointer;">
+        <div class="card-title" style="margin-bottom:6px; text-transform:none; letter-spacing:0; font-size:15px; color:var(--text);">Empezar de cero</div>
+        <p style="margin:0; font-size:13.5px; color:var(--text-muted); line-height:1.5;">No tenes nada para recuperar: arma tu perfil y tu rutina desde el principio.</p>
+      </div>
+      <input type="file" id="welcome-file-input" accept="application/json" style="display:none;" />
+    `;
+    let pendingWelcomeAction = null;
+    const welcomeFileInput = document.getElementById("welcome-file-input");
+    root.querySelector('[data-welcome="new"]').addEventListener("click", () => {
+      STATE.onboardStep = "mode";
+      renderOnboarding();
+    });
+    root.querySelector('[data-welcome="recover"]').addEventListener("click", () => {
+      pendingWelcomeAction = "recover";
+      welcomeFileInput.click();
+    });
+    root.querySelector('[data-welcome="shared"]').addEventListener("click", () => {
+      pendingWelcomeAction = "shared";
+      welcomeFileInput.click();
+    });
+    welcomeFileInput.addEventListener("change", () => {
+      const file = welcomeFileInput.files && welcomeFileInput.files[0];
+      if (!file) return;
+      mdgymReadJsonFile(
+        file,
+        (data) => {
+          if (pendingWelcomeAction === "recover") {
+            const result = mdgymRestoreBackupPayload(data);
+            if (!result.ok) {
+              alert(result.error);
+              return;
+            }
+            showView("home");
+          } else if (pendingWelcomeAction === "shared") {
+            if (!mdgymIsRoutineShareFile(data)) {
+              alert("El archivo no es una rutina compartida valida de MDGym.");
+              return;
+            }
+            STATE.pendingSharedRoutine = data;
+            STATE.onboardData.mode = data.mode || "assistant";
+            STATE.onboardStep = "personal";
+            renderOnboarding();
+          }
+        },
+        (msg) => alert(msg)
+      );
+    });
+    return;
+  }
 
   // Paso "mode": eleccion inicial entre asistente y manual. No usa el
   // footer generico: elegir una tarjeta avanza directo al paso siguiente.
@@ -615,6 +835,11 @@ function renderOnboarding() {
   if (backBtn) backBtn.addEventListener("click", () => {
     STATE.onboardStep = steps[idx - 1];
     if (STATE.onboardStep === "equipment") STATE.equipmentPickMode = null;
+    // si estabamos completando datos personales para aplicar una rutina
+    // compartida y el usuario se arrepiente/vuelve atras, descartamos esa
+    // rutina pendiente (si no, quedaria "colgada" y podria aplicarse mas
+    // adelante sin que el usuario lo haya pedido en ese momento).
+    if (STATE.onboardStep === "mode") STATE.pendingSharedRoutine = null;
     renderOnboarding();
   });
 
@@ -636,6 +861,21 @@ function onboardNext() {
       return;
     }
     Object.assign(STATE.onboardData, { name, age, sex, weightKg, heightCm });
+
+    // Si venimos de "Abrir una rutina compartida" (paso "welcome"), con
+    // los datos personales ya alcanza: la rutina, el equipo, el objetivo
+    // y los dias ya vienen definidos en el archivo, asi que no hace falta
+    // repetir el resto del asistente. Armamos el perfil directo y
+    // saltamos a la pantalla final.
+    if (STATE.pendingSharedRoutine) {
+      const profile = mdgymBuildProfileFromSharedRoutine(STATE.onboardData, STATE.pendingSharedRoutine);
+      MDGymStore.saveProfile(profile);
+      MDGymStore.addBodyLog({ date: todayISO(), weightKg: STATE.onboardData.weightKg });
+      STATE.pendingSharedRoutine = null;
+      STATE.onboardStep = "ready";
+      renderOnboarding();
+      return;
+    }
   } else if (step === "location") {
     if (!STATE.onboardData.location) {
       alert("Elegi donde vas a entrenar.");
@@ -2245,6 +2485,16 @@ function renderSettings() {
       </div>
       `}
 
+      <div class="section-title">Compartir rutina</div>
+      <div class="card">
+        <p class="note" style="margin-top:0;">Descarga un archivo con SOLO tu rutina (sin tu nombre, edad, peso ni historial) para pasarsela a otra persona, o abri un archivo que te haya compartido alguien para probar su rutina (reemplaza la tuya; tu historial no se borra).</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-export-routine" style="flex:1;">Descargar mi rutina</button>
+          <button class="btn btn-secondary" id="btn-import-routine" style="flex:1;">Abrir rutina compartida</button>
+        </div>
+        <input type="file" id="import-routine-file" accept="application/json" style="display:none;" />
+      </div>
+
       <div class="section-title">Empezar de nuevo</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Volve al inicio de todo: podes reusar tus datos actuales para editarlos, o arrancar en blanco. Tu historial de entrenamientos no se borra con esto.</p>
@@ -2269,8 +2519,13 @@ function renderSettings() {
 
     <div class="section-title">Datos</div>
     <div class="card">
-      <p class="note" style="margin-top:0;">MDGym guarda todo (perfil, rutina, historial) solo en este navegador (localStorage). No hay cuenta ni nube: si cambias de dispositivo o borras el cache del sitio, se pierde.</p>
-      <button class="btn btn-danger" id="btn-clear-all">Borrar todos mis datos</button>
+      <p class="note" style="margin-top:0;">MDGym guarda todo (perfil, rutina, historial) solo en este navegador (localStorage). No hay cuenta ni nube: si cambias de dispositivo, borras el cache del sitio, o abris la app desde otra direccion, se pierde. Para no perderlo, exporta un respaldo de vez en cuando y guardalo en algun lugar (ej: tu propio drive); si alguna vez lo perdes, lo recuperas desde ese mismo archivo.</p>
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="btn-export-backup" style="flex:1;">Exportar mis datos</button>
+        <button class="btn btn-secondary" id="btn-import-backup" style="flex:1;">Restaurar desde archivo</button>
+      </div>
+      <input type="file" id="import-backup-file" accept="application/json" style="display:none;" />
+      <button class="btn btn-danger" id="btn-clear-all" style="margin-top:10px;">Borrar todos mis datos</button>
     </div>
 
     <div class="section-title">Creditos</div>
@@ -2283,6 +2538,35 @@ function renderSettings() {
   document.getElementById("btn-back-settings").addEventListener("click", () => showView("home"));
 
   document.getElementById("btn-show-credits").addEventListener("click", openCreditsModal);
+
+  document.getElementById("btn-export-backup").addEventListener("click", () => {
+    if (!MDGymStore.getProfile()) {
+      alert("Todavia no hay nada para exportar (no armaste un perfil).");
+      return;
+    }
+    mdgymDownloadJson(`mdgym-respaldo-${todayISO()}.json`, mdgymBuildBackupPayload());
+  });
+
+  const importBackupBtn = document.getElementById("btn-import-backup");
+  const importBackupFile = document.getElementById("import-backup-file");
+  importBackupBtn.addEventListener("click", () => importBackupFile.click());
+  importBackupFile.addEventListener("change", () => {
+    const file = importBackupFile.files && importBackupFile.files[0];
+    if (!file) return;
+    mdgymReadJsonFile(
+      file,
+      (data) => {
+        const result = mdgymRestoreBackupPayload(data);
+        if (!result.ok) {
+          alert(result.error);
+          return;
+        }
+        alert("Datos restaurados. La app se va a recargar.");
+        location.reload();
+      },
+      (msg) => alert(msg)
+    );
+  });
 
   root.querySelectorAll("[data-theme-choice]").forEach((sw) =>
     sw.addEventListener("click", () => {
@@ -2297,6 +2581,44 @@ function renderSettings() {
   );
 
   if (!profile) return;
+
+  const exportRoutineBtn = document.getElementById("btn-export-routine");
+  if (exportRoutineBtn) {
+    exportRoutineBtn.addEventListener("click", () => {
+      const p = MDGymStore.getProfile();
+      const safeName = (p.name || "rutina").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+      mdgymDownloadJson(`mdgym-rutina-${safeName || "rutina"}.json`, mdgymBuildRoutineSharePayload(p));
+    });
+  }
+
+  const importRoutineBtn = document.getElementById("btn-import-routine");
+  const importRoutineFile = document.getElementById("import-routine-file");
+  if (importRoutineBtn && importRoutineFile) {
+    importRoutineBtn.addEventListener("click", () => importRoutineFile.click());
+    importRoutineFile.addEventListener("change", () => {
+      const file = importRoutineFile.files && importRoutineFile.files[0];
+      if (!file) return;
+      mdgymReadJsonFile(
+        file,
+        (data) => {
+          if (!mdgymIsRoutineShareFile(data)) {
+            alert("El archivo no es una rutina compartida valida de MDGym.");
+            return;
+          }
+          if (!confirm("Esto va a reemplazar tu rutina actual (tu historial de entrenamientos no se borra). ¿Continuar?")) return;
+          const current = MDGymStore.getProfile();
+          const result = mdgymApplySharedRoutineToProfile(data, current);
+          if (!result.ok) {
+            alert(result.error);
+            return;
+          }
+          alert("Rutina importada. La app se va a recargar.");
+          location.reload();
+        },
+        (msg) => alert(msg)
+      );
+    });
+  }
 
   const restartBtn = document.getElementById("btn-restart");
   if (restartBtn) restartBtn.addEventListener("click", openRestartModal);
@@ -2379,6 +2701,7 @@ function renderSettings() {
   if (rotateBtn) {
     rotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
+      p.weekIndex = (p.weekIndex || 0) + 1;
       p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();

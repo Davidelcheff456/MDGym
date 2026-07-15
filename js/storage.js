@@ -109,6 +109,11 @@ const MDGymStore = {
   getBodyLog() {
     return mdgymRead(MDGYM_KEYS.bodyLog, []);
   },
+  // Setter "en bloque" (a diferencia de addBodyLog, que agrega/reemplaza
+  // una sola entrada): hace falta para restaurar un respaldo completo.
+  saveBodyLog(log) {
+    mdgymWrite(MDGYM_KEYS.bodyLog, log);
+  },
   addBodyLog(entry) {
     const log = this.getBodyLog();
     const idx = log.findIndex((e) => e.date === entry.date);
