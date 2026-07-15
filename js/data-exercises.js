@@ -1385,7 +1385,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "isolation",
-  "instructions_es": "De pie, con los brazos extendidos a los costados, hace circulos amplios y controlados hacia adelante y despues hacia atras, sin forzar el hombro."
+  "instructions_es": "De pie, con los brazos extendidos a los costados, hace circulos amplios y controlados hacia adelante y despues hacia atras, sin forzar el hombro.",
+  "howto_images": [
+   "assets/howto/Mobility_Arm_Circles_0.jpg",
+   "assets/howto/Mobility_Arm_Circles_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Hip_Circles",
@@ -1397,7 +1401,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "isolation",
-  "instructions_es": "Con las manos en la cintura, hace circulos amplios con la cadera hacia un lado y despues hacia el otro, moviendo la zona lumbar y la cadera en todo su rango."
+  "instructions_es": "Con las manos en la cintura, hace circulos amplios con la cadera hacia un lado y despues hacia el otro, moviendo la zona lumbar y la cadera en todo su rango.",
+  "howto_images": [
+   "assets/howto/Mobility_Hip_Circles_0.jpg",
+   "assets/howto/Mobility_Hip_Circles_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Lunge_Rotation",
@@ -1409,7 +1417,10 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Desde una zancada larga hacia adelante, apoya la mano contraria en el piso y rota el torso llevando el otro brazo hacia arriba, siguiendolo con la mirada. Alterna de lado."
+  "instructions_es": "Desde una zancada larga hacia adelante, apoya la mano contraria en el piso y rota el torso llevando el otro brazo hacia arriba, siguiendolo con la mirada. Alterna de lado.",
+  "howto_images": [
+   "assets/howto/Mobility_Lunge_Rotation_0.png"
+  ]
  },
  {
   "id": "Mobility_Cat_Cow",
@@ -1421,7 +1432,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "isolation",
-  "instructions_es": "En cuatro apoyos, alterna entre arquear la espalda hacia arriba (redondeando, mirando al ombligo) y hacia abajo (arqueando la zona lumbar, mirando al frente), de forma lenta y controlada."
+  "instructions_es": "En cuatro apoyos, alterna entre arquear la espalda hacia arriba (redondeando, mirando al ombligo) y hacia abajo (arqueando la zona lumbar, mirando al frente), de forma lenta y controlada.",
+  "howto_images": [
+   "assets/howto/Mobility_Cat_Cow_0.jpg",
+   "assets/howto/Mobility_Cat_Cow_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Ankle_Circles",
@@ -1433,7 +1448,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "isolation",
-  "instructions_es": "Apoyado en un pie (o sentado), levanta el otro pie del piso y hace circulos amplios con el tobillo hacia un lado y despues hacia el otro. Repeti con el otro pie."
+  "instructions_es": "Apoyado en un pie (o sentado), levanta el otro pie del piso y hace circulos amplios con el tobillo hacia un lado y despues hacia el otro. Repeti con el otro pie.",
+  "howto_images": [
+   "assets/howto/Mobility_Ankle_Circles_0.jpg",
+   "assets/howto/Mobility_Ankle_Circles_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Wrist_Circles",
@@ -1445,7 +1464,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "isolation",
-  "instructions_es": "Con los brazos extendidos al frente, hace circulos con las munecas hacia un lado y despues hacia el otro. Util antes de ejercicios que cargan la muneca (press, flexiones)."
+  "instructions_es": "Con los brazos extendidos al frente, hace circulos con las munecas hacia un lado y despues hacia el otro. Util antes de ejercicios que cargan la muneca (press, flexiones).",
+  "howto_images": [
+   "assets/howto/Mobility_Wrist_Circles_0.jpg",
+   "assets/howto/Mobility_Wrist_Circles_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Leg_Swings",
@@ -1457,7 +1480,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Apoyado de una pared o algo estable, balancea una pierna hacia adelante y atras en un arco controlado, sin perder el equilibrio. Repeti con la otra pierna."
+  "instructions_es": "Apoyado de una pared o algo estable, balancea una pierna hacia adelante y atras en un arco controlado, sin perder el equilibrio. Repeti con la otra pierna.",
+  "howto_images": [
+   "assets/howto/Mobility_Leg_Swings_0.jpg",
+   "assets/howto/Mobility_Leg_Swings_1.jpg"
+  ]
  },
  {
   "id": "Mobility_Arm_Swings",
@@ -1469,7 +1496,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "De pie, cruza los brazos extendidos frente al pecho alternando cual queda arriba, en un movimiento fluido tipo tijera, para activar hombros y pecho antes de entrenar."
+  "instructions_es": "De pie, cruza los brazos extendidos frente al pecho alternando cual queda arriba, en un movimiento fluido tipo tijera, para activar hombros y pecho antes de entrenar.",
+  "howto_images": [
+   "assets/howto/Mobility_Arm_Swings_0.jpg",
+   "assets/howto/Mobility_Arm_Swings_1.jpg"
+  ]
  },
  {
   "id": "Cardio_Jumping_Jacks",

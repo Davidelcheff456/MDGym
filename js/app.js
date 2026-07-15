@@ -32,7 +32,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 const STATE = {
   onboardStep: "welcome",
-  onboardData: { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], daysPerWeek: 3 },
+  onboardData: { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], daysPerWeek: 3, includeMobility: false },
   previewRoutine: null, // rutina propuesta por el asistente, pendiente de confirmar/ajustar
   onboardAdjustMode: false, // dentro del paso "review": false = viendo la propuesta, true = tildando que sacar
   adjustRemoved: {}, // claves "dayIdx-exIdx" tildadas para sacar en el ajuste post-generacion
@@ -50,6 +50,15 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Perfiles nuevos (armados desde que existe esta pregunta en el onboarding)
+// traen includeMobility explicito (true/false, segun lo que eligio la
+// persona). Perfiles viejos no tienen ese campo (undefined): para esos
+// mantenemos el comportamiento de antes (movilidad incluida siempre), asi
+// no le cambiamos la rutina a nadie que ya la tenia armada.
+function mdgymProfileWantsMobility(profile) {
+  return profile.includeMobility === undefined ? true : !!profile.includeMobility;
+}
+
 function formatDateEs(iso) {
   const d = new Date(iso + "T00:00:00");
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
@@ -64,8 +73,21 @@ function mdgymPickRandom(arr) {
 function mdgymMotivationText(pool, name) {
   const template = mdgymPickRandom(pool);
   if (!template) return "";
-  const safeName = name && String(name).trim() ? String(name).trim() : "crack";
-  return template.replace(/\{name\}/g, safeName);
+  const safeName = name && String(name).trim() ? String(name).trim() : "";
+  let text = template.replace(/\{name\}/g, safeName);
+  if (!safeName) {
+    // El nombre es obligatorio en el onboarding, asi que esto no deberia
+    // pasar nunca en uso normal. Por las dudas, si faltara, preferimos
+    // limpiar los espacios/comas sueltos de la frase antes que inventar
+    // un apodo generico en su lugar.
+    text = text
+      .replace(/^,\s*/, "")
+      .replace(/\s+,/g, ",")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    text = text.charAt(0).toUpperCase() + text.slice(1);
+  }
+  return text;
 }
 
 function mdgymGetWeekRangeForDate(dateObj) {
@@ -262,7 +284,11 @@ function mdgymBuildRoutineExplanationHtml(profile) {
 
     <div class="section-title">Como se arma cada dia</div>
     <div class="card">
-      <p style="margin:0;">Cada dia arranca con un bloque corto de <b>movilidad</b> (activacion articular general, para llegar mejor preparado a los ejercicios principales), sigue con el bloque de <b>fuerza</b> especifico de ese dia segun el split, y cierra con un <b>finisher de cardio</b>. Es una estructura general de entrada en calor + trabajo principal + cierre, no una prescripcion medica: si algo no te cae bien, podes sacarlo desde "Editar ejercicios de este dia".</p>
+      <p style="margin:0;">${
+        mdgymProfileWantsMobility(profile)
+          ? 'Cada dia arranca con un bloque corto de <b>movilidad</b> (activacion articular general, para llegar mejor preparado a los ejercicios principales), sigue con el bloque de <b>fuerza</b> especifico de ese dia segun el split, y cierra con un <b>finisher de cardio</b>. Es una estructura general de entrada en calor + trabajo principal + cierre, no una prescripcion medica: si algo no te cae bien, podes sacarlo desde "Editar ejercicios de este dia".'
+          : 'Cada dia tiene el bloque de <b>fuerza</b> especifico de ese dia segun el split, y cierra con un <b>finisher de cardio</b>. No incluimos el bloque de movilidad porque asi lo elegiste (lo podes sumar cuando quieras desde Configuracion).'
+      }</p>
     </div>
 
     <div class="section-title">Beneficios esperados</div>
@@ -466,7 +492,7 @@ function mdgymOnboardSteps(mode) {
   if (mode === "manual") {
     return ["mode", "personal", "location", "equipment", "days", "build", "ready"];
   }
-  return ["mode", "personal", "location", "equipment", "goals", "days", "explain", "review", "ready"];
+  return ["mode", "personal", "location", "equipment", "goals", "mobility", "days", "explain", "review", "ready"];
 }
 
 // En "casa" no mostramos maquinas de gimnasio ni estaciones de polea: solo
@@ -648,14 +674,16 @@ function renderOnboarding() {
     return;
   }
 
-  // Paso "ready": pantalla final antes de entrar a la app.
+  // Paso "ready": pantalla final antes de entrar a la app. El "por que" de
+  // la rutina (mdgymBuildRoutineExplanationHtml) ya se mostro una vez en el
+  // paso "explain", antes de generarla: repetirlo aca era mostrar lo mismo
+  // dos veces, asi que aca solo confirmamos que esta lista.
   if (step === "ready") {
     const profile = MDGymStore.getProfile();
     const isManual = profile && profile.mode === "manual";
     root.innerHTML = `
       <div class="onboard-title">Tu rutina esta lista</div>
-      <div class="onboard-sub">${isManual ? "La armaste vos mismo, dia por dia." : "Antes de arrancar, esto es lo que armamos y por que."}</div>
-      ${isManual ? "" : mdgymBuildRoutineExplanationHtml(profile)}
+      <div class="onboard-sub">${isManual ? "La armaste vos mismo, dia por dia." : "Ya podes empezar a entrenar con ella."}</div>
       <div class="btn-row" style="margin-top:18px;">
         <button class="btn btn-primary" id="ob-start">Empezar mi rutina</button>
       </div>
@@ -750,6 +778,15 @@ function renderOnboarding() {
         ).join("")}
       </div>
     `;
+  } else if (step === "mobility") {
+    body = `
+      <div class="onboard-title">¿Sumamos ejercicios de movilidad?</div>
+      <div class="onboard-sub">Son un par de ejercicios cortos de movilidad articular al principio de cada dia, antes de la parte de fuerza. Es opcional: si no los queres, tu rutina arranca directo con fuerza.</div>
+      <div class="chip-group" id="mobility-chips">
+        <div class="chip chip-icon ${STATE.onboardData.includeMobility ? "selected" : ""}" data-mobility="yes">${window.mdgymIcon("stretch", 15)}<span>Si, sumalos</span></div>
+        <div class="chip chip-icon ${!STATE.onboardData.includeMobility ? "selected" : ""}" data-mobility="no">${window.mdgymIcon("close", 15)}<span>No, gracias</span></div>
+      </div>
+    `;
   } else if (step === "days") {
     body = `
       <div class="onboard-title">¿Cuantos dias por semana?</div>
@@ -766,7 +803,7 @@ function renderOnboarding() {
     `;
   } else if (step === "explain") {
     const tempScheme = window.mdgymCombineGoals(STATE.onboardData.goals);
-    const fakeProfile = { goals: STATE.onboardData.goals, daysPerWeek: STATE.onboardData.daysPerWeek, goalScheme: tempScheme };
+    const fakeProfile = { goals: STATE.onboardData.goals, daysPerWeek: STATE.onboardData.daysPerWeek, goalScheme: tempScheme, includeMobility: !!STATE.onboardData.includeMobility };
     body = `
       <div class="onboard-title">Antes de mostrarte la rutina...</div>
       <div class="onboard-sub">Esto es en que nos vamos a basar para armarla.</div>
@@ -800,6 +837,15 @@ function renderOnboarding() {
         if (i >= 0) STATE.onboardData.goals.splice(i, 1);
         else STATE.onboardData.goals.push(id);
         c.classList.toggle("selected");
+      })
+    );
+  }
+  if (step === "mobility") {
+    root.querySelectorAll("[data-mobility]").forEach((c) =>
+      c.addEventListener("click", () => {
+        STATE.onboardData.includeMobility = c.dataset.mobility === "yes";
+        root.querySelectorAll("[data-mobility]").forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
       })
     );
   }
@@ -902,7 +948,7 @@ function onboardNext() {
       return;
     }
   } else if (step === "explain") {
-    STATE.previewRoutine = window.mdgymBuildRoutine(STATE.onboardData.daysPerWeek, STATE.onboardData.equipment, 0);
+    STATE.previewRoutine = window.mdgymBuildRoutine(STATE.onboardData.daysPerWeek, STATE.onboardData.equipment, 0, STATE.onboardData.includeMobility);
     STATE.onboardAdjustMode = false;
     STATE.adjustRemoved = {};
     STATE.onboardStep = "review";
@@ -1055,6 +1101,7 @@ function finishOnboardingAssistant() {
     goals: d.goals,
     equipment: d.equipment,
     daysPerWeek: d.daysPerWeek,
+    includeMobility: !!d.includeMobility,
     goalScheme,
     weekIndex: 0,
     routine: STATE.previewRoutine,
@@ -1357,13 +1404,19 @@ function renderHome() {
 
   // Mensaje motivador semanal: si con el entreno de HOY se cierra la meta
   // de dias/semana (y hoy todavia no esta guardado), mostramos un empujon.
+  // Solo tiene sentido si la meta semanal es de 2 dias o mas: con 1 dia por
+  // semana, CUALQUIER entreno (incluido el primero que hace la persona en
+  // toda la app) matematicamente "cierra la semana", y decirle a alguien
+  // que esta terminando su semana en su primer o segundo dia de uso suena
+  // a error. Por eso, si el objetivo es de 1 dia/semana, no mostramos este
+  // aviso (ese caso ya se explica solo, no necesita el empujon).
   const weekRange = mdgymGetWeekRangeForDate(new Date(today + "T00:00:00"));
   const weekStartIso = mdgymDateToISO(weekRange.start);
   const weekEndIso = mdgymDateToISO(weekRange.end);
   const sessionsThisWeek = MDGymStore.getSessions().filter((s) => s.date >= weekStartIso && s.date <= weekEndIso);
   const weekGoal = profile.daysPerWeek || 1;
   const weekRemaining = weekGoal - sessionsThisWeek.length;
-  const weekMotivationHtml = (weekRemaining === 1 && !existingSession)
+  const weekMotivationHtml = (weekGoal >= 2 && weekRemaining === 1 && !existingSession)
     ? `<div class="motivation-card motivation-week">${window.mdgymIcon("tip", 18)}<span>${mdgymMotivationText(window.MDGYM_MOTIVATION_WEEK, profile.name)}</span></div>`
     : "";
 
@@ -1669,7 +1722,7 @@ function renderHome() {
     suggestRotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
       p.weekIndex = (p.weekIndex || 0) + 1;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
+      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();
       p.rotationDismissedUntil = null;
@@ -1891,7 +1944,7 @@ function openWeeklyWrapModal() {
       const prof = MDGymStore.getProfile();
       if (!prof) { close(); return; }
       prof.weekIndex = (prof.weekIndex || 0) + 1;
-      prof.routine = window.mdgymBuildRoutine(prof.daysPerWeek, prof.equipment, prof.weekIndex);
+      prof.routine = window.mdgymBuildRoutine(prof.daysPerWeek, prof.equipment, prof.weekIndex, mdgymProfileWantsMobility(prof));
       prof.nextDayIndex = 0;
       prof.lastRotationDate = todayISO();
       prof.rotationDismissedUntil = null;
@@ -2107,16 +2160,30 @@ function renderMonthView() {
   // ------------------------------------------------------------
   const goal = profile.daysPerWeek || 1;
   const todayDateObj = new Date(todayStr + "T00:00:00");
+  const profileStartIso = profile.startDate || todayStr;
   const weekRanges = mdgymGetWeekRangesForMonth(year, month);
   const weekRowsHtml = weekRanges.map((w) => {
     const startIso = mdgymDateToISO(w.start);
     const endIso = mdgymDateToISO(w.end);
     const trainedCount = sessions.filter((s) => s.date >= startIso && s.date <= endIso).length;
     const isOngoing = todayDateObj >= w.start && todayDateObj <= w.end;
+    // Semanas que terminaron ANTES de que existiera el perfil (o sea, antes
+    // de que la persona empezara a usar la app) no se evaluan como "meta
+    // cumplida/no cumplida": todavia no habia ninguna meta fijada esos dias,
+    // asi que no tiene sentido marcarlas como incumplidas.
+    const beforeProfile = endIso < profileStartIso;
+    // Semanas que todavia no arrancaron (estan mas adelante que hoy) tampoco
+    // se pueden evaluar: no tiene sentido decir que una semana futura "no
+    // llego a la meta" si todavia ni empezo.
+    const isFuture = w.start > todayDateObj;
     const met = trainedCount >= goal;
     let statusHtml;
-    if (isOngoing) {
+    if (beforeProfile) {
+      statusHtml = `<span class="week-status week-before">Todavia no usabas la app</span>`;
+    } else if (isOngoing) {
       statusHtml = `<span class="week-status week-ongoing">Semana en curso</span>`;
+    } else if (isFuture) {
+      statusHtml = `<span class="week-status week-before">Semana futura</span>`;
     } else if (met) {
       statusHtml = `<span class="week-status week-met">Meta cumplida</span>`;
     } else {
@@ -2478,6 +2545,16 @@ function renderSettings() {
         <button class="btn btn-secondary" id="btn-save-days" style="margin-top:10px;">Guardar dias y regenerar rutina</button>
       </div>
 
+      <div class="section-title">Movilidad</div>
+      <div class="card">
+        <p class="note" style="margin-top:0;">Un par de ejercicios cortos de movilidad articular al principio de cada dia, antes de la parte de fuerza.</p>
+        <div class="chip-group" id="s-mobility-chips">
+          <div class="chip chip-icon ${mdgymProfileWantsMobility(profile) ? "selected" : ""}" data-smobility="yes">${window.mdgymIcon("stretch", 15)}<span>Si, sumalos</span></div>
+          <div class="chip chip-icon ${!mdgymProfileWantsMobility(profile) ? "selected" : ""}" data-smobility="no">${window.mdgymIcon("close", 15)}<span>No, gracias</span></div>
+        </div>
+        <button class="btn btn-secondary" id="btn-save-mobility" style="margin-top:10px;">Guardar y regenerar rutina</button>
+      </div>
+
       <div class="section-title">Variedad</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Si sentis que se repiten siempre los mismos ejercicios, rotá las variantes disponibles para tu equipo.</p>
@@ -2638,6 +2715,12 @@ function renderSettings() {
       c.classList.add("selected");
     })
   );
+  root.querySelectorAll("[data-smobility]").forEach((c) =>
+    c.addEventListener("click", () => {
+      root.querySelectorAll("[data-smobility]").forEach((x) => x.classList.remove("selected"));
+      c.classList.add("selected");
+    })
+  );
 
   document.getElementById("btn-save-profile").addEventListener("click", () => {
     const p = MDGymStore.getProfile();
@@ -2674,7 +2757,7 @@ function renderSettings() {
       const selected = Array.from(root.querySelectorAll("[data-sequip].selected")).map((c) => c.dataset.sequip);
       if (!selected.length) { alert("Marca al menos un equipo."); return; }
       p.equipment = selected;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
+      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       MDGymStore.saveProfile(p);
       alert("Equipamiento actualizado y rutina regenerada.");
@@ -2689,10 +2772,24 @@ function renderSettings() {
       const chosen = root.querySelector("[data-sdays].selected");
       if (!chosen) { alert("Elegi cuantos dias por semana."); return; }
       p.daysPerWeek = Number(chosen.dataset.sdays);
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
+      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
       p.nextDayIndex = 0;
       MDGymStore.saveProfile(p);
       alert("Dias actualizados y rutina regenerada.");
+      renderSettings();
+    });
+  }
+
+  const saveMobilityBtn = document.getElementById("btn-save-mobility");
+  if (saveMobilityBtn) {
+    saveMobilityBtn.addEventListener("click", () => {
+      const p = MDGymStore.getProfile();
+      const chosen = root.querySelector("[data-smobility].selected");
+      p.includeMobility = !chosen || chosen.dataset.smobility === "yes";
+      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, p.includeMobility);
+      p.nextDayIndex = p.nextDayIndex % p.routine.length;
+      MDGymStore.saveProfile(p);
+      alert("Preferencia de movilidad actualizada y rutina regenerada.");
       renderSettings();
     });
   }
@@ -2702,7 +2799,7 @@ function renderSettings() {
     rotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
       p.weekIndex = (p.weekIndex || 0) + 1;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex);
+      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();
       p.rotationDismissedUntil = null;

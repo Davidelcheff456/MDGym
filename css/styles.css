@@ -849,6 +849,7 @@ button, input, select {
 .week-status.week-met { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .week-status.week-notmet { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
 .week-status.week-ongoing { background: var(--bg-elevated-2); color: var(--text-muted); }
+.week-status.week-before { background: var(--bg-elevated-2); color: var(--text-muted); }
 
 /* ---------- Mensajes motivadores (dia / semana) ---------- */
 .motivation-card {
@@ -926,8 +927,4 @@ button, input, select {
 /* ---------- Barra de descanso entre series ---------- */
 .rest-timer-bar {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--accent);
-  color: var(--accent-text);
-  border-rad
+  align-items: ce

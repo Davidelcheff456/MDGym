@@ -314,22 +314,25 @@ window.MDGYM_GOAL_INFO = {
 };
 
 // ---------- Mensajes motivadores (uso el nombre del usuario, {name}) ----------
+// Se muestran en momentos puntuales (no todo el tiempo), asi que tratamos
+// de que cada frase diga algo concreto sobre ESE momento en particular,
+// en vez de relleno generico tipo "vos podes".
 window.MDGYM_MOTIVATION_DAY = [
-  "Dale {name}, ya casi lo tenes, falta uno solo.",
-  "{name}, un ejercicio mas y cerraste el dia.",
-  "Vamos {name}, se viene el ultimo.",
-  "{name}, esto ya esta cerca de terminar.",
-  "Un empujon mas, {name}, vos podes.",
-  "{name}, no aflojes ahora que falta poco.",
-  "Ultimo esfuerzo, {name}, despues descansas.",
-  "{name}, ya hiciste la parte dificil, termina fuerte.",
+  "{name}, te queda un ejercicio para cerrar el entreno de hoy.",
+  "Un ejercicio mas, {name}, y terminaste la sesion de hoy.",
+  "{name}, ya hiciste la mayor parte del entreno. Falta uno solo.",
+  "Estas en el ultimo ejercicio del dia, {name}.",
+  "{name}, con este ejercicio completas lo de hoy.",
+  "Ya casi, {name}: un ejercicio mas y podes descansar.",
+  "{name}, este es el ultimo tramo del entreno de hoy.",
+  "Te falta un ejercicio, {name}. El resto ya esta hecho.",
 ];
 
 window.MDGYM_MOTIVATION_WEEK = [
-  "{name}, con el entreno de hoy cerras tu semana.",
-  "Dale {name}, hoy cumplis tu meta semanal.",
-  "{name}, este es el ultimo dia que te falta esta semana.",
-  "Vamos {name}, hoy completas los dias que te propusiste.",
-  "{name}, un entreno mas y ya cumpliste la semana.",
-  "Hoy es el dia, {name}: cerras tu semana con este entreno.",
+  "{name}, con el entreno de hoy completas los dias que te propusiste esta semana.",
+  "Este es el ultimo dia que te faltaba entrenar esta semana, {name}.",
+  "{name}, si haces el entreno de hoy, cumplis tu meta semanal.",
+  "Con esta sesion cerras la semana que planificaste, {name}.",
+  "{name}, hoy es el dia pendiente que te faltaba para completar la semana.",
+  "Te falta este entreno para terminar la semana completa, {name}.",
 ];

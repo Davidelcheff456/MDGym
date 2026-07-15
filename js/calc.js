@@ -95,13 +95,19 @@ function mdgymSuggestSimilar(exerciseId, equipmentList, excludeIds) {
 
 // dayTypeKey: "full" | "upper" | "lower" | "push" | "pull" | "legs"
 // weekIndex: numero entero que aumenta cada semana (para rotar variantes)
-function mdgymBuildDay(dayTypeKey, equipmentList, weekIndex) {
+// includeMobility: si es false, se sacan los slots de movilidad de la
+// plantilla (el usuario no los pidio). Por defecto (true, o si no se pasa
+// el parametro) se incluyen, para no cambiar el comportamiento de perfiles
+// viejos que ya venian con movilidad siempre incluida.
+function mdgymBuildDay(dayTypeKey, equipmentList, weekIndex, includeMobility) {
   const template = window.MDGYM_DAY_TEMPLATES[dayTypeKey];
   if (!template) return { label: dayTypeKey, exercises: [], missing: [] };
+  const wantMobility = includeMobility !== false;
+  const slots = wantMobility ? template.slots : template.slots.filter((s) => s.muscle !== "movilidad");
   const used = new Set();
   const exercises = [];
   const missing = [];
-  template.slots.forEach((slot, slotIdx) => {
+  slots.forEach((slot, slotIdx) => {
     for (let i = 0; i < slot.count; i++) {
       const seed = weekIndex * 7 + slotIdx * 3 + i;
       const picked = mdgymPickExercisesForSlot(slot.muscle, equipmentList, used, seed);
@@ -117,11 +123,11 @@ function mdgymBuildDay(dayTypeKey, equipmentList, weekIndex) {
 }
 
 // Arma la rutina completa (secuencia de dias) segun dias/semana elegidos.
-function mdgymBuildRoutine(daysPerWeek, equipmentList, weekIndex) {
+function mdgymBuildRoutine(daysPerWeek, equipmentList, weekIndex, includeMobility) {
   const sequence = window.MDGYM_SPLIT_BY_DAYS[daysPerWeek] || window.MDGYM_SPLIT_BY_DAYS[3];
   return sequence.map((dayType, i) => ({
     dayType,
-    ...mdgymBuildDay(dayType, equipmentList, weekIndex + i),
+    ...mdgymBuildDay(dayType, equipmentList, weekIndex + i, includeMobility),
   }));
 }
 
