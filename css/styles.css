@@ -819,6 +819,9 @@ button, input, select {
 .cal-cell.cal-low { background: rgba(239,68,68,.18); }
 .cal-cell.cal-low .cal-pct { color: var(--danger); }
 .cal-cell.cal-today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal-cell.cal-clickable { cursor: pointer; }
+.cal-cell.cal-clickable:active { opacity: .7; }
+.cal-cell.cal-future { opacity: .45; }
 .cal-month-nav {
   display: flex;
   align-items: center;

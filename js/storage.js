@@ -70,6 +70,12 @@ const MDGymStore = {
   getSessionByDate(date) {
     return this.getSessions().find((s) => s.date === date) || null;
   },
+  // Borra por completo el entrenamiento registrado en esa fecha (usado al
+  // editar un dia pasado desde el calendario "Mes" y arrepentirse del todo).
+  deleteSessionByDate(date) {
+    const all = this.getSessions().filter((s) => s.date !== date);
+    this.saveSessions(all);
+  },
 
   // Devuelve el ultimo peso registrado (kg) para un ejercicio, antes de
   // la fecha dada (o en general si no se pasa fecha). null si no hay.

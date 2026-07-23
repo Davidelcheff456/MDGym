@@ -2233,8 +2233,9 @@ function renderMonthView() {
       tierClass = pct >= 80 ? "cal-high" : pct >= 40 ? "cal-mid" : "cal-low";
       pctHtml = `<span class="cal-pct">${pct}%</span>`;
     }
+    const isFutureDay = dateStr > todayStr;
     cells.push(`
-      <div class="cal-cell ${session ? "cal-trained " + tierClass : ""} ${isToday ? "cal-today" : ""}" data-caldate="${dateStr}" title="${dateStr}">
+      <div class="cal-cell ${session ? "cal-trained " + tierClass : ""} ${isToday ? "cal-today" : ""} ${isFutureDay ? "cal-future" : "cal-clickable"}" data-caldate="${isFutureDay ? "" : dateStr}" title="${dateStr}">
         <span class="cal-daynum">${day}</span>
         ${pctHtml}
       </div>
@@ -2327,6 +2328,263 @@ function renderMonthView() {
     STATE.monthViewOffset = (STATE.monthViewOffset || 0) + 1;
     renderMonthView();
   });
+
+  // Tocar un dia pasado (o hoy) abre el detalle de ese entrenamiento y deja
+  // agregar/sacar ejercicios y editar reps/kg, aunque haya sido hace
+  // semanas. Los dias futuros no tienen data-caldate (no se puede "loguear"
+  // un entrenamiento que todavia no paso).
+  root.querySelectorAll(".cal-cell[data-caldate]").forEach((cell) => {
+    if (!cell.dataset.caldate) return;
+    cell.addEventListener("click", () => openDayLogModal(cell.dataset.caldate));
+  });
+}
+
+// ============================================================
+// EDITAR ENTRENAMIENTO DE UN DIA PASADO (desde el calendario "Mes")
+// ============================================================
+// Permite agregar ejercicios que ya hiciste (con su peso) a un dia que ya
+// paso, sacar ejercicios cargados por error, ajustar reps/kg, o borrar el
+// entrenamiento entero. Trabaja sobre una copia local (JSON.parse/stringify)
+// y recien pisa lo guardado cuando se toca "Guardar".
+function openDayLogModal(dateStr) {
+  const profile = MDGymStore.getProfile();
+  if (!profile) return;
+  const scheme = profile.goalScheme || { sets: 3, reps: 10, restSec: 75 };
+  const existingSession = MDGymStore.getSessionByDate(dateStr);
+  let exercises = existingSession ? JSON.parse(JSON.stringify(existingSession.exercises || [])) : [];
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">${formatDateEs(dateStr)}</div>
+          <div class="modal-sub">${existingSession ? "Editar entrenamiento" : "Registrar entrenamiento de este dia"}</div>
+        </div>
+        <button class="icon-btn" id="btn-close-daylog" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="daylog-list"></div>
+      <button class="btn btn-secondary" id="btn-daylog-add" style="margin-top:10px;">+ Agregar ejercicio</button>
+      <div class="btn-row" style="margin-top:16px;">
+        ${existingSession ? `<button class="btn btn-danger" id="btn-daylog-delete" style="flex:1;">Borrar entrenamiento</button>` : ""}
+        <button class="btn btn-primary" id="btn-daylog-save" style="flex:1;">Guardar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-daylog").addEventListener("click", close);
+
+  function renderList() {
+    const listEl = backdrop.querySelector("#daylog-list");
+    if (!exercises.length) {
+      listEl.innerHTML = `<p class="note">Todavia no agregaste ningun ejercicio a este dia.</p>`;
+      return;
+    }
+    listEl.innerHTML = exercises
+      .map((ex, exIdx) => {
+        const setsHtml = ex.sets
+          .map((set, setIdx) => `
+            <div class="set-row" data-exidx="${exIdx}" data-setidx="${setIdx}">
+              <span class="set-badge">${setIdx + 1}</span>
+              <input type="number" inputmode="numeric" class="dl-reps" data-exidx="${exIdx}" data-setidx="${setIdx}" placeholder="reps" value="${set.reps != null ? set.reps : ""}" />
+              <input type="number" inputmode="decimal" class="dl-weight" data-exidx="${exIdx}" data-setidx="${setIdx}" placeholder="kg" value="${set.weightKg != null ? set.weightKg : ""}" />
+              <button type="button" class="icon-btn dl-remove-set" data-exidx="${exIdx}" data-setidx="${setIdx}" aria-label="Sacar serie" ${ex.sets.length <= 1 ? "disabled" : ""}>${window.mdgymIcon("close", 12)}</button>
+            </div>
+          `)
+          .join("");
+        return `
+          <div class="exercise-card" style="align-items:flex-start;">
+            <div class="exercise-info" style="width:100%;">
+              <div class="exercise-name">${ex.name_es}</div>
+              <div class="sets-table">
+                <div class="sets-header"><span></span><span>Reps</span><span>Kg</span><span></span></div>
+                ${setsHtml}
+              </div>
+              <div class="btn-row" style="margin-top:8px; gap:8px;">
+                <button type="button" class="btn btn-secondary dl-addset" data-exidx="${exIdx}" style="flex:1; padding:8px 10px; font-size:12.5px;">+ Serie</button>
+                <button type="button" class="btn btn-danger dl-removeex" data-exidx="${exIdx}" style="flex:1; padding:8px 10px; font-size:12.5px;">Sacar ejercicio</button>
+              </div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+    wireList();
+  }
+
+  function wireList() {
+    const listEl = backdrop.querySelector("#daylog-list");
+    listEl.querySelectorAll(".dl-reps").forEach((inp) =>
+      inp.addEventListener("change", () => {
+        const ex = exercises[Number(inp.dataset.exidx)];
+        const set = ex && ex.sets[Number(inp.dataset.setidx)];
+        if (!set) return;
+        set.reps = inp.value !== "" ? Number(inp.value) : null;
+      })
+    );
+    listEl.querySelectorAll(".dl-weight").forEach((inp) =>
+      inp.addEventListener("change", () => {
+        const ex = exercises[Number(inp.dataset.exidx)];
+        const set = ex && ex.sets[Number(inp.dataset.setidx)];
+        if (!set) return;
+        set.weightKg = inp.value !== "" ? Number(inp.value) : null;
+      })
+    );
+    listEl.querySelectorAll(".dl-remove-set").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const ex = exercises[Number(btn.dataset.exidx)];
+        if (!ex || ex.sets.length <= 1) return;
+        ex.sets.splice(Number(btn.dataset.setidx), 1);
+        renderList();
+      })
+    );
+    listEl.querySelectorAll(".dl-addset").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        const ex = exercises[Number(btn.dataset.exidx)];
+        if (!ex) return;
+        ex.sets.push({ reps: scheme.reps, weightKg: null, done: false });
+        renderList();
+      })
+    );
+    listEl.querySelectorAll(".dl-removeex").forEach((btn) =>
+      btn.addEventListener("click", () => {
+        exercises.splice(Number(btn.dataset.exidx), 1);
+        renderList();
+      })
+    );
+  }
+
+  renderList();
+
+  backdrop.querySelector("#btn-daylog-add").addEventListener("click", () => {
+    openDayLogExercisePicker(profile, dateStr, exercises, (exId) => {
+      const ex = window.MDGYM_EXERCISES.find((e) => e.id === exId);
+      if (!ex) return;
+      // sugerimos el peso segun el ultimo registro ANTES de esta fecha (no
+      // "antes de hoy"): si estas cargando un entrenamiento de hace 2
+      // semanas, tiene mas sentido comparar contra lo que hiciste antes de
+      // esa fecha, no contra tu ultimo registro en general.
+      const lastBefore = MDGymStore.getLastWeightForExercise(ex.id, dateStr);
+      const sets = Array.from({ length: scheme.sets }, () => ({
+        reps: scheme.reps,
+        weightKg: lastBefore ? lastBefore.weightKg : null,
+        done: false,
+      }));
+      exercises.push({ exerciseId: ex.id, name_es: ex.name_es, sets });
+      renderList();
+    });
+  });
+
+  const deleteBtn = backdrop.querySelector("#btn-daylog-delete");
+  if (deleteBtn) {
+    deleteBtn.addEventListener("click", () => {
+      if (!confirm("¿Borrar por completo el entrenamiento de este dia?")) return;
+      MDGymStore.deleteSessionByDate(dateStr);
+      close();
+      renderMonthView();
+    });
+  }
+
+  backdrop.querySelector("#btn-daylog-save").addEventListener("click", () => {
+    const cleanExercises = exercises
+      .map((ex) => ({
+        exerciseId: ex.exerciseId,
+        name_es: ex.name_es,
+        sets: ex.sets.map((s) => ({
+          reps: s.reps != null && s.reps !== "" ? Number(s.reps) : null,
+          weightKg: s.weightKg != null && s.weightKg !== "" ? Number(s.weightKg) : null,
+          done: s.weightKg != null && s.weightKg !== "",
+        })),
+      }))
+      .filter((ex) => ex.sets.length);
+    if (!cleanExercises.length) {
+      alert("Agrega al menos un ejercicio antes de guardar.");
+      return;
+    }
+    const session = {
+      date: dateStr,
+      dayType: existingSession ? existingSession.dayType : "retroactivo",
+      dayLabel: existingSession ? existingSession.dayLabel : "Entrenamiento registrado",
+      exercises: cleanExercises,
+    };
+    MDGymStore.upsertSession(session);
+    close();
+    renderMonthView();
+  });
+}
+
+// Modal para elegir un ejercicio a agregar dentro de openDayLogModal.
+// Filtra por el equipamiento del perfil y excluye los que ese dia ya tiene
+// cargados (mismo criterio que el resto de los selectores de ejercicio de
+// la app). onPick(exerciseId) se llama al elegir uno.
+function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
+  const alreadyIn = new Set(currentExercises.map((e) => e.exerciseId));
+  const equipmentList = profile.equipment || [];
+  const pool = window.MDGYM_EXERCISES.filter(
+    (e) => equipmentList.includes(e.equipment) && !alreadyIn.has(e.id)
+  );
+  const groups = {};
+  pool.forEach((e) => {
+    groups[e.muscle_group] = groups[e.muscle_group] || [];
+    groups[e.muscle_group].push(e);
+  });
+
+  const pickerBackdrop = document.createElement("div");
+  pickerBackdrop.className = "modal-backdrop";
+  pickerBackdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Agregar ejercicio</div>
+          <div class="modal-sub">Filtrado por tu equipamiento</div>
+        </div>
+        <button class="icon-btn" id="btn-close-daylog-picker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div class="field"><input type="text" id="daylog-picker-search" placeholder="Buscar ejercicio..." /></div>
+      <div id="daylog-picker-list">
+        ${
+          Object.keys(groups).length
+            ? Object.keys(groups)
+                .map(
+                  (g) => `
+          <div class="equip-group-title">${capitalize(g)}</div>
+          ${groups[g].map((e) => `<div class="link-row" data-dlpick="${e.id}"><span>${e.name_es}</span><span class="badge">${e.equipment_es}</span></div>`).join("")}
+        `
+                )
+                .join("")
+            : `<p class="note">No quedan mas ejercicios disponibles con tu equipamiento actual.</p>`
+        }
+      </div>
+    </div>
+  `;
+  document.body.appendChild(pickerBackdrop);
+
+  const closePicker = () => pickerBackdrop.remove();
+  pickerBackdrop.addEventListener("click", (e) => {
+    if (e.target === pickerBackdrop) closePicker();
+  });
+  pickerBackdrop.querySelector("#btn-close-daylog-picker").addEventListener("click", closePicker);
+  pickerBackdrop.querySelectorAll("[data-dlpick]").forEach((row) =>
+    row.addEventListener("click", () => {
+      onPick(row.dataset.dlpick);
+      closePicker();
+    })
+  );
+  const searchInput = pickerBackdrop.querySelector("#daylog-picker-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      pickerBackdrop.querySelectorAll("[data-dlpick]").forEach((row) => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
+    });
+  }
 }
 
 function renderCompletionChartSvg(sessions) {
