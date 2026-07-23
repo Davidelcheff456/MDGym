@@ -5,7 +5,7 @@ const MDGYM_UI_ICONS = {
   home: '<path d="M4 11.5 12 4l8 7.5" /><path d="M6 10v9h5v-5h2v5h5v-9" />',
   calendar: '<rect x="4" y="5.5" width="16" height="15" rx="2.5" /><path d="M8 3.5v4M16 3.5v4M4 10h16" /><circle cx="8" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1" fill="currentColor" stroke="none"/><circle cx="8" cy="17.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="17.5" r="1" fill="currentColor" stroke="none"/>',
   chart: '<path d="M4 19h16" /><path d="M7 19v-6M12 19V7M17 19v-10" />',
-  gear: '<circle cx="12" cy="12" r="3.2" /><path d="M12 3.5v2.4M12 18.1v2.4M20.5 12h-2.4M5.9 12H3.5M17.7 6.3l-1.7 1.7M8 16l-1.7 1.7M17.7 17.7 16 16M8 8 6.3 6.3" />',
+  gear: '<circle cx="12" cy="12" r="7.5" /><circle cx="12" cy="12" r="2.6" /><path d="M19.5 12L21.7 12M17.3 17.3L18.86 18.86M12 19.5L12 21.7M6.7 17.3L5.14 18.86M4.5 12L2.3 12M6.7 6.7L5.14 5.14M12 4.5L12 2.3M17.3 6.7L18.86 5.14" stroke-width="2.6" />',
   check: '<path d="M5 13l4.5 4.5L19 8" />',
   refresh: '<path d="M4 12a8 8 0 0 1 13.5-5.7M20 12a8 8 0 0 1-13.5 5.7" /><path d="M17 3v4h-4M7 21v-4h4" />',
   close: '<path d="M6 6l12 12M18 6L6 18" />',

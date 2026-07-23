@@ -64,6 +64,36 @@ function formatDateEs(iso) {
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// Saca tildes/diacriticos y pasa a minusculas, para que buscar "musculo" o
+// "músculo" (o cualquier combinacion con/sin acento) de el mismo resultado.
+function mdgymNormalizeSearch(s) {
+  const DIACRITICS_RE = new RegExp("[" + String.fromCharCode(0x0300) + "-" + String.fromCharCode(0x036f) + "]", "g");
+  return String(s || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(DIACRITICS_RE, "");
+}
+
+// Texto completo donde buscar un ejercicio: nombre en espanol, nombre en
+// ingles (el original del dataset), musculo especifico, grupo muscular,
+// equipo y el id interno (con guiones bajos cambiados por espacios). Asi,
+// sin importar si buscas por como lo llamarias vos, por el musculo que
+// trabaja o por el equipo, lo vas a encontrar - no hace falta saber
+// exactamente como quedo registrado en la app.
+function mdgymExerciseSearchText(ex) {
+  return mdgymNormalizeSearch(
+    [ex.name_es, ex.name_en, ex.primary_muscle, ex.muscle_group, ex.equipment_es, ex.id]
+      .filter(Boolean)
+      .join(" ")
+      .replace(/_/g, " ")
+  );
+}
+function mdgymExerciseMatchesQuery(ex, query) {
+  const q = mdgymNormalizeSearch(query).trim();
+  if (!q) return true;
+  return mdgymExerciseSearchText(ex).includes(q);
+}
+
 // Semanas completas transcurridas desde una fecha (0 si es hoy o si no hay fecha).
 function mdgymPickRandom(arr) {
   if (!arr || !arr.length) return "";
@@ -1209,11 +1239,58 @@ function renderOnboardBuildStep(root) {
   });
 }
 
-// Modal generico para elegir un ejercicio del catalogo (filtrado por
-// equipamiento disponible), con buscador simple por texto.
+// Modal chico que aparece al elegir, en cualquier buscador de ejercicios, uno
+// que usa equipo que el usuario no tiene tildado. Ofrece 2 caminos (mas
+// cerrar sin hacer nada): agregarlo a su equipamiento de forma permanente
+// (queda disponible de ahi en mas, tanto para este buscador como para el
+// generador automatico de rutinas), o agregarlo solo por esta vez (el
+// ejercicio entra nomas a lo que se esta editando ahora, el equipamiento del
+// perfil no cambia).
+function mdgymConfirmUnavailableEquipment(ex, onAddPermanent, onAddOnce) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet" style="max-width:380px;">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Equipo no disponible</div>
+          <div class="modal-sub">${ex.name_es}</div>
+        </div>
+        <button class="icon-btn" id="btn-close-equipconfirm" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <p class="note" style="margin-top:2px;">"${ex.equipment_es}" no esta en tu equipamiento configurado (por eso no aparecia antes). ¿Que queres hacer?</p>
+      <div class="btn-row" style="margin-top:14px; flex-direction:column; gap:8px;">
+        <button class="btn btn-primary" id="btn-equip-permanent" style="width:100%;">Agregar a mi equipamiento (queda disponible siempre)</button>
+        <button class="btn btn-secondary" id="btn-equip-once" style="width:100%;">Agregar solo por esta vez</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-equipconfirm").addEventListener("click", close);
+  backdrop.querySelector("#btn-equip-permanent").addEventListener("click", () => {
+    close();
+    onAddPermanent();
+  });
+  backdrop.querySelector("#btn-equip-once").addEventListener("click", () => {
+    close();
+    onAddOnce();
+  });
+}
+
+// Modal generico para elegir un ejercicio del catalogo COMPLETO (ya no se
+// filtra por equipamiento: los que no coinciden con lo que el usuario tiene
+// tildado se muestran igual, marcados con un aviso, y eligiendolos dispara
+// mdgymConfirmUnavailableEquipment en vez de agregarse directo). Buscador de
+// texto ampliado (nombre ES/EN, musculo, equipo, id) via
+// mdgymExerciseMatchesQuery, para que encuentre el ejercicio sin importar
+// desde que angulo lo busques.
 function openManualExercisePicker(dayIdx) {
   const equipmentList = STATE.onboardData.equipment;
-  const pool = window.MDGYM_EXERCISES.filter((e) => equipmentList.includes(e.equipment));
+  const pool = window.MDGYM_EXERCISES;
   const groups = {};
   pool.forEach((e) => {
     groups[e.muscle_group] = groups[e.muscle_group] || [];
@@ -1227,19 +1304,25 @@ function openManualExercisePicker(dayIdx) {
       <div class="modal-header">
         <div>
           <div class="modal-title">Agregar ejercicio</div>
-          <div class="modal-sub">Filtrado por tu equipamiento</div>
+          <div class="modal-sub">Los que no tenes en tu equipamiento igual aparecen, marcados</div>
         </div>
         <button class="icon-btn" id="btn-close-picker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
       </div>
       <div class="field"><input type="text" id="picker-search" placeholder="Buscar ejercicio..." /></div>
       <div id="picker-list">
         ${Object.keys(groups)
-          .map(
-            (g) => `
-          <div class="equip-group-title">${capitalize(g)}</div>
-          ${groups[g].map((e) => `<div class="link-row" data-pick="${e.id}"><span>${e.name_es}</span><span class="badge">${e.equipment_es}</span></div>`).join("")}
-        `
-          )
+          .map((g) => {
+            const rows = groups[g]
+              .map((e) => {
+                const available = equipmentList.includes(e.equipment);
+                return `<div class="link-row ${available ? "" : "link-row-unavailable"}" data-pick="${e.id}">
+                  <span>${e.name_es}</span>
+                  <span class="badge ${available ? "" : "badge-warn"}">${available ? e.equipment_es : "No disponible: " + e.equipment_es}</span>
+                </div>`;
+              })
+              .join("");
+            return `<div class="picker-group" data-group="${g}"><div class="equip-group-title">${capitalize(g)}</div>${rows}</div>`;
+          })
           .join("")}
       </div>
     </div>
@@ -1251,20 +1334,41 @@ function openManualExercisePicker(dayIdx) {
     if (e.target === backdrop) close();
   });
   backdrop.querySelector("#btn-close-picker").addEventListener("click", close);
+
+  const doAdd = (ex) => {
+    STATE.manualBuild.days[dayIdx].exercises.push({ ...ex, customSets: 3, customReps: 10, customRestSec: 60 });
+    renderOnboarding();
+  };
   backdrop.querySelectorAll("[data-pick]").forEach((row) =>
     row.addEventListener("click", () => {
       const exId = row.dataset.pick;
       const ex = window.MDGYM_EXERCISES.find((e) => e.id === exId);
       if (!ex) return;
-      STATE.manualBuild.days[dayIdx].exercises.push({ ...ex, customSets: 3, customReps: 10, customRestSec: 60 });
-      close();
-      renderOnboarding();
+      if (equipmentList.includes(ex.equipment)) {
+        close();
+        doAdd(ex);
+      } else {
+        close();
+        mdgymConfirmUnavailableEquipment(
+          ex,
+          () => {
+            if (!STATE.onboardData.equipment.includes(ex.equipment)) STATE.onboardData.equipment.push(ex.equipment);
+            doAdd(ex);
+          },
+          () => doAdd(ex)
+        );
+      }
     })
   );
   backdrop.querySelector("#picker-search").addEventListener("input", (e) => {
-    const q = e.target.value.trim().toLowerCase();
+    const q = e.target.value;
     backdrop.querySelectorAll("[data-pick]").forEach((row) => {
-      row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+      const ex = window.MDGYM_EXERCISES.find((x) => x.id === row.dataset.pick);
+      row.style.display = ex && mdgymExerciseMatchesQuery(ex, q) ? "" : "none";
+    });
+    backdrop.querySelectorAll(".picker-group").forEach((g) => {
+      const anyVisible = Array.from(g.querySelectorAll("[data-pick]")).some((r) => r.style.display !== "none");
+      g.style.display = anyVisible ? "" : "none";
     });
   });
 }
@@ -1766,9 +1870,7 @@ function openHomeExercisePicker(dayIdx) {
   const day = profile.routine[dayIdx];
   const alreadyIn = new Set(day.exercises.map((e) => e.id));
   const equipmentList = profile.equipment || [];
-  const pool = window.MDGYM_EXERCISES.filter(
-    (e) => equipmentList.includes(e.equipment) && !alreadyIn.has(e.id)
-  );
+  const pool = window.MDGYM_EXERCISES.filter((e) => !alreadyIn.has(e.id));
   const groups = {};
   pool.forEach((e) => {
     groups[e.muscle_group] = groups[e.muscle_group] || [];
@@ -1782,7 +1884,7 @@ function openHomeExercisePicker(dayIdx) {
       <div class="modal-header">
         <div>
           <div class="modal-title">Agregar ejercicio</div>
-          <div class="modal-sub">Filtrado por tu equipamiento · Dia ${dayIdx + 1}</div>
+          <div class="modal-sub">Dia ${dayIdx + 1} · los que no tenes en tu equipamiento igual aparecen, marcados</div>
         </div>
         <button class="icon-btn" id="btn-close-picker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
       </div>
@@ -1791,14 +1893,20 @@ function openHomeExercisePicker(dayIdx) {
         ${
           Object.keys(groups).length
             ? Object.keys(groups)
-                .map(
-                  (g) => `
-          <div class="equip-group-title">${capitalize(g)}</div>
-          ${groups[g].map((e) => `<div class="link-row" data-pick="${e.id}"><span>${e.name_es}</span><span class="badge">${e.equipment_es}</span></div>`).join("")}
-        `
-                )
+                .map((g) => {
+                  const rows = groups[g]
+                    .map((e) => {
+                      const available = equipmentList.includes(e.equipment);
+                      return `<div class="link-row ${available ? "" : "link-row-unavailable"}" data-pick="${e.id}">
+                        <span>${e.name_es}</span>
+                        <span class="badge ${available ? "" : "badge-warn"}">${available ? e.equipment_es : "No disponible: " + e.equipment_es}</span>
+                      </div>`;
+                    })
+                    .join("");
+                  return `<div class="picker-group" data-group="${g}"><div class="equip-group-title">${capitalize(g)}</div>${rows}</div>`;
+                })
                 .join("")
-            : `<p class="note">No quedan mas ejercicios disponibles con tu equipamiento actual para agregar a este dia.</p>`
+            : `<p class="note">Ya agregaste todos los ejercicios del catalogo a este dia.</p>`
         }
       </div>
     </div>
@@ -1810,29 +1918,54 @@ function openHomeExercisePicker(dayIdx) {
     if (e.target === backdrop) close();
   });
   backdrop.querySelector("#btn-close-picker").addEventListener("click", close);
+
+  const doAdd = (ex) => {
+    const p = MDGymStore.getProfile();
+    const d = p.routine[dayIdx];
+    if (d.exercises.some((e) => e.id === ex.id)) return;
+    d.exercises.push({ ...ex });
+    MDGymStore.saveProfile(p);
+    renderHome();
+  };
+  const addEquipmentPermanently = (equipmentId) => {
+    const p = MDGymStore.getProfile();
+    if (!p.equipment.includes(equipmentId)) {
+      p.equipment.push(equipmentId);
+      MDGymStore.saveProfile(p);
+    }
+  };
   backdrop.querySelectorAll("[data-pick]").forEach((row) =>
     row.addEventListener("click", () => {
       const exId = row.dataset.pick;
       const ex = window.MDGYM_EXERCISES.find((e) => e.id === exId);
       if (!ex) return;
-      const p = MDGymStore.getProfile();
-      const d = p.routine[dayIdx];
-      if (d.exercises.some((e) => e.id === exId)) {
+      if (equipmentList.includes(ex.equipment)) {
         close();
-        return;
+        doAdd(ex);
+      } else {
+        close();
+        mdgymConfirmUnavailableEquipment(
+          ex,
+          () => {
+            addEquipmentPermanently(ex.equipment);
+            doAdd(ex);
+          },
+          () => doAdd(ex)
+        );
       }
-      d.exercises.push({ ...ex });
-      MDGymStore.saveProfile(p);
-      close();
-      renderHome();
     })
   );
   const searchInput = backdrop.querySelector("#picker-search");
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
+      const q = e.target.value;
       backdrop.querySelectorAll("[data-pick]").forEach((row) => {
-        row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+        const ex = window.MDGYM_EXERCISES.find((x) => x.id === row.dataset.pick);
+        row.style.display = ex && mdgymExerciseMatchesQuery(ex, q) ? "" : "none";
+      });
+      backdrop.querySelectorAll(".picker-group").forEach((g) => {
+        const anyVisible = Array.from(g.querySelectorAll("[data-pick]")).some((r) => r.style.display !== "none");
+        g.style.display = anyVisible ? "" : "none";
       });
     });
   }
@@ -2526,9 +2659,7 @@ function openDayLogModal(dateStr) {
 function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
   const alreadyIn = new Set(currentExercises.map((e) => e.exerciseId));
   const equipmentList = profile.equipment || [];
-  const pool = window.MDGYM_EXERCISES.filter(
-    (e) => equipmentList.includes(e.equipment) && !alreadyIn.has(e.id)
-  );
+  const pool = window.MDGYM_EXERCISES.filter((e) => !alreadyIn.has(e.id));
   const groups = {};
   pool.forEach((e) => {
     groups[e.muscle_group] = groups[e.muscle_group] || [];
@@ -2542,7 +2673,7 @@ function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
       <div class="modal-header">
         <div>
           <div class="modal-title">Agregar ejercicio</div>
-          <div class="modal-sub">Filtrado por tu equipamiento</div>
+          <div class="modal-sub">Los que no tenes en tu equipamiento igual aparecen, marcados</div>
         </div>
         <button class="icon-btn" id="btn-close-daylog-picker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
       </div>
@@ -2551,14 +2682,20 @@ function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
         ${
           Object.keys(groups).length
             ? Object.keys(groups)
-                .map(
-                  (g) => `
-          <div class="equip-group-title">${capitalize(g)}</div>
-          ${groups[g].map((e) => `<div class="link-row" data-dlpick="${e.id}"><span>${e.name_es}</span><span class="badge">${e.equipment_es}</span></div>`).join("")}
-        `
-                )
+                .map((g) => {
+                  const rows = groups[g]
+                    .map((e) => {
+                      const available = equipmentList.includes(e.equipment);
+                      return `<div class="link-row ${available ? "" : "link-row-unavailable"}" data-dlpick="${e.id}">
+                        <span>${e.name_es}</span>
+                        <span class="badge ${available ? "" : "badge-warn"}">${available ? e.equipment_es : "No disponible: " + e.equipment_es}</span>
+                      </div>`;
+                    })
+                    .join("");
+                  return `<div class="picker-group" data-group="${g}"><div class="equip-group-title">${capitalize(g)}</div>${rows}</div>`;
+                })
                 .join("")
-            : `<p class="note">No quedan mas ejercicios disponibles con tu equipamiento actual.</p>`
+            : `<p class="note">Ya agregaste todos los ejercicios del catalogo.</p>`
         }
       </div>
     </div>
@@ -2572,16 +2709,40 @@ function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
   pickerBackdrop.querySelector("#btn-close-daylog-picker").addEventListener("click", closePicker);
   pickerBackdrop.querySelectorAll("[data-dlpick]").forEach((row) =>
     row.addEventListener("click", () => {
-      onPick(row.dataset.dlpick);
-      closePicker();
+      const exId = row.dataset.dlpick;
+      const ex = window.MDGYM_EXERCISES.find((e) => e.id === exId);
+      if (!ex) return;
+      if (equipmentList.includes(ex.equipment)) {
+        closePicker();
+        onPick(exId);
+      } else {
+        closePicker();
+        mdgymConfirmUnavailableEquipment(
+          ex,
+          () => {
+            const p = MDGymStore.getProfile();
+            if (!p.equipment.includes(ex.equipment)) {
+              p.equipment.push(ex.equipment);
+              MDGymStore.saveProfile(p);
+            }
+            onPick(exId);
+          },
+          () => onPick(exId)
+        );
+      }
     })
   );
   const searchInput = pickerBackdrop.querySelector("#daylog-picker-search");
   if (searchInput) {
     searchInput.addEventListener("input", (e) => {
-      const q = e.target.value.trim().toLowerCase();
+      const q = e.target.value;
       pickerBackdrop.querySelectorAll("[data-dlpick]").forEach((row) => {
-        row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+        const ex = window.MDGYM_EXERCISES.find((x) => x.id === row.dataset.dlpick);
+        row.style.display = ex && mdgymExerciseMatchesQuery(ex, q) ? "" : "none";
+      });
+      pickerBackdrop.querySelectorAll(".picker-group").forEach((g) => {
+        const anyVisible = Array.from(g.querySelectorAll("[data-dlpick]")).some((r) => r.style.display !== "none");
+        g.style.display = anyVisible ? "" : "none";
       });
     });
   }
