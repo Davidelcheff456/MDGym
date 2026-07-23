@@ -29,6 +29,8 @@ window.MDGYM_EQUIPMENT_CATALOG = [
   { id: "machine_calf_raise", label: "Maquina de pantorrillas (sentado)", group: "Maquinas", icon: "machine" },
   { id: "machine_calf_raise_standing", label: "Maquina de pantorrillas (de pie)", group: "Maquinas", icon: "machine" },
   { id: "machine_ab_crunch", label: "Maquina de abdominales", group: "Maquinas", icon: "machine" },
+  { id: "machine_hip_abduction", label: "Maquina de abduccion (cara externa muslo)", group: "Maquinas", icon: "machine" },
+  { id: "machine_hip_adduction", label: "Maquina de aduccion (cara interna muslo)", group: "Maquinas", icon: "machine" },
 
   { id: "cable_crossover", label: "Polea - cruce (crossover)", group: "Poleas", icon: "cable" },
   { id: "cable_lat_pulldown", label: "Polea alta - jalon al pecho", group: "Poleas", icon: "cable" },

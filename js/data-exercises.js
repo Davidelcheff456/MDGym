@@ -1000,6 +1000,42 @@ window.MDGYM_EXERCISES = [
   ]
  },
  {
+  "id": "Thigh_Abductor",
+  "name_en": "Thigh Abductor",
+  "name_es": "Maquina de Abduccion",
+  "muscle_group": "piernas",
+  "primary_muscle": "abductors",
+  "equipment": "machine_hip_abduction",
+  "equipment_es": "Maquina de abduccion",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "image": "Thigh_Abductor/0.jpg",
+  "instructions_es": "Sentado en la maquina con las piernas apoyadas en las almohadillas, separalas hacia afuera contra la resistencia de forma controlada y volve a juntarlas sin soltar de golpe.",
+  "image_local": "assets/exercises/Thigh_Abductor.jpg",
+  "howto_images": [
+   "assets/howto/Thigh_Abductor_0.jpg",
+   "assets/howto/Thigh_Abductor_1.jpg"
+  ]
+ },
+ {
+  "id": "Thigh_Adductor",
+  "name_en": "Thigh Adductor",
+  "name_es": "Maquina de Aduccion",
+  "muscle_group": "piernas",
+  "primary_muscle": "adductors",
+  "equipment": "machine_hip_adduction",
+  "equipment_es": "Maquina de aduccion",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "image": "Thigh_Adductor/0.jpg",
+  "instructions_es": "Sentado en la maquina con las piernas apoyadas en las almohadillas, juntalas hacia adentro contra la resistencia de forma controlada y volve a abrirlas sin soltar de golpe.",
+  "image_local": "assets/exercises/Thigh_Adductor.jpg",
+  "howto_images": [
+   "assets/howto/Thigh_Adductor_0.jpg",
+   "assets/howto/Thigh_Adductor_1.jpg"
+  ]
+ },
+ {
   "id": "Seated_Calf_Raise",
   "name_en": "Seated Calf Raise",
   "name_es": "Elevacion de Pantorrillas Sentado",
