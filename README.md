@@ -19,8 +19,9 @@ registrar el peso usado en cada ejercicio dia a dia.
   [wger.de](https://wger.de), licencia CC-BY-SA 3.0/4.0 o CC0 segun la imagen).
   Los de movilidad y cardio no tienen un musculo puntual, asi que en su lugar
   usan directamente su propia foto real de ejecucion como imagen principal.
-  En total, 92 de los ~93 ejercicios tienen hasta 3 fotos reales de ejecucion
-  (de wger.de o de free-exercise-db, segun el ejercicio) — ver el detalle
+  En total, los ~93 ejercicios tienen fotos reales de ejecucion, tomadas de
+  wger.de, de free-exercise-db o (para Burpees, el unico caso sin coincidencia
+  confiable en esas dos) de [Pexels](https://www.pexels.com) — ver el detalle
   completo de autores y licencias abajo, y dentro de la app en Configuracion →
   Creditos.
 - El equipamiento se elige maquina por maquina (prensa de piernas, polea alta,
@@ -118,9 +119,3 @@ muevas de lugar, ya viene incluida).
 - No hay cuenta ni respaldo en la nube: si queres pasar tu historial a otro
   dispositivo, por ahora no hay forma automatica (se podria agregar un
   exportar/importar `.json` mas adelante).
-- Un solo ejercicio (Burpees) todavia no tiene fotos reales de ejecucion: no
-  encontramos una coincidencia confiable ni en free-exercise-db ni en
-  wger.de (que ademas esta bloqueando pedidos automatizados con un desafio
-  anti-bots al momento de escribir esto), asi que preferimos no mostrar una
-  foto incorrecta antes que arriesgar el formato. Se puede ir sumando a mano
-  en `js/data-exercises.js` (campo `howto_images`).

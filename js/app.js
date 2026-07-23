@@ -2013,12 +2013,21 @@ function openExerciseDetail(exerciseId) {
   const ex = window.MDGYM_EXERCISES.find((e) => e.id === exerciseId);
   if (!ex) return;
   const howto = ex.howto_images || [];
+  // En movilidad/cardio la primera foto ya se muestra arriba del todo
+  // (mdgymExerciseModalVisualHtml), asi que la galeria arranca desde la
+  // segunda para no repetir la misma imagen dos veces en el mismo modal.
+  // En el resto de los ejercicios la imagen de arriba es el diagrama
+  // muscular (distinta de las fotos), asi que ahi la galeria sigue
+  // mostrando desde la primera.
+  const galleryPhotos = mdgymMuscleGroupIcon(ex.muscle_group) ? howto.slice(1) : howto;
 
-  const gallery = howto.length
-    ? `<div class="howto-gallery">${howto
+  const gallery = galleryPhotos.length
+    ? `<div class="howto-gallery">${galleryPhotos
         .slice(0, 3)
         .map((src) => `<img src="${src}" alt="${ex.name_es}" loading="lazy" />`)
         .join("")}</div>`
+    : howto.length
+    ? ""
     : `<div class="howto-empty">Todavia no tenemos fotos de ejecucion para este ejercicio. Guiate por la descripcion de abajo.</div>`;
 
   const backdrop = document.createElement("div");
@@ -2229,17 +2238,20 @@ function mdgymExerciseThumbHtml(ex, size) {
 
 // HTML para la imagen grande del modal de detalle (reemplaza el <img> de
 // diagrama muscular por un icono centrado cuando no aplica). Para
-// movilidad/cardio, si el ejercicio ya tiene fotos reales, esta imagen
-// grande se omite (devuelve "") porque la galeria de mas abajo (gallery,
-// en openExerciseDetail) ya muestra esas mismas fotos: mostrarla de nuevo
-// aca arriba seria repetir la primera foto dos veces en el mismo modal.
-// El icono generico solo aparece si el ejercicio todavia no tiene ninguna
-// foto real (por ahora, unicamente Cardio_Burpees).
+// movilidad/cardio usamos la primera foto real del ejercicio (misma que el
+// thumbnail chico), igual criterio que el resto de los ejercicios, que
+// siempre muestran algo arriba del todo. Para no repetir esa misma foto
+// dentro de la galeria de mas abajo, openExerciseDetail arranca la galeria
+// desde la segunda foto en estos casos. El icono generico solo aparece si
+// el ejercicio todavia no tiene ninguna foto real (por ahora, unicamente
+// Cardio_Burpees).
 function mdgymExerciseModalVisualHtml(ex) {
   const iconName = mdgymMuscleGroupIcon(ex.muscle_group);
   if (iconName) {
-    const hasPhoto = ex.howto_images && ex.howto_images.length;
-    return hasPhoto ? "" : `<div class="modal-muscle-img modal-muscle-icon">${window.mdgymIcon(iconName, 56)}</div>`;
+    const firstPhoto = ex.howto_images && ex.howto_images[0];
+    return firstPhoto
+      ? `<img class="modal-muscle-img" src="${firstPhoto}" alt="${ex.name_es}" />`
+      : `<div class="modal-muscle-img modal-muscle-icon">${window.mdgymIcon(iconName, 56)}</div>`;
   }
   return `<img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />`;
 }
