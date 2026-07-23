@@ -1548,7 +1548,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Salta abriendo piernas y brazos al mismo tiempo, y volve a la posicion inicial en el siguiente salto. Mantene un ritmo constante durante el tiempo u repeticiones indicadas."
+  "instructions_es": "Salta abriendo piernas y brazos al mismo tiempo, y volve a la posicion inicial en el siguiente salto. Mantene un ritmo constante durante el tiempo u repeticiones indicadas.",
+  "howto_images": [
+   "assets/howto/Cardio_Jumping_Jacks_0.jpg",
+   "assets/howto/Cardio_Jumping_Jacks_1.jpg"
+  ]
  },
  {
   "id": "Cardio_High_Knees",
@@ -1560,7 +1564,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Corre en el lugar llevando las rodillas lo mas alto posible hacia el pecho, alternando rapido entre una pierna y la otra, con los brazos acompañando el movimiento."
+  "instructions_es": "Corre en el lugar llevando las rodillas lo mas alto posible hacia el pecho, alternando rapido entre una pierna y la otra, con los brazos acompañando el movimiento.",
+  "howto_images": [
+   "assets/howto/Cardio_High_Knees_0.jpg",
+   "assets/howto/Cardio_High_Knees_1.jpg"
+  ]
  },
  {
   "id": "Cardio_Mountain_Climbers",
@@ -1572,7 +1580,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "En posicion de plancha, lleva una rodilla hacia el pecho y despues la otra, alternando rapido como si estuvieras corriendo en el lugar pero horizontal, manteniendo la cadera estable."
+  "instructions_es": "En posicion de plancha, lleva una rodilla hacia el pecho y despues la otra, alternando rapido como si estuvieras corriendo en el lugar pero horizontal, manteniendo la cadera estable.",
+  "howto_images": [
+   "assets/howto/Cardio_Mountain_Climbers_0.jpg",
+   "assets/howto/Cardio_Mountain_Climbers_1.jpg"
+  ]
  },
  {
   "id": "Cardio_Jump_Squats",
@@ -1584,7 +1596,11 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Baja a una sentadilla y desde ahi impulsa hacia arriba con un salto, aterrizando suave y volviendo a bajar directo a la siguiente sentadilla."
+  "instructions_es": "Baja a una sentadilla y desde ahi impulsa hacia arriba con un salto, aterrizando suave y volviendo a bajar directo a la siguiente sentadilla.",
+  "howto_images": [
+   "assets/howto/Cardio_Jump_Squats_0.jpg",
+   "assets/howto/Cardio_Jump_Squats_1.jpg"
+  ]
  },
  {
   "id": "Cardio_Burpees",
@@ -1608,6 +1624,10 @@ window.MDGYM_EXERCISES = [
   "equipment_es": "Peso corporal",
   "level": "beginner",
   "mechanic": "compound",
-  "instructions_es": "Corre sin desplazarte, con un ritmo sostenido y los brazos acompañando el movimiento como si estuvieras trotando."
+  "instructions_es": "Corre sin desplazarte, con un ritmo sostenido y los brazos acompañando el movimiento como si estuvieras trotando.",
+  "howto_images": [
+   "assets/howto/Cardio_Running_In_Place_0.jpg",
+   "assets/howto/Cardio_Running_In_Place_1.jpg"
+  ]
  }
 ];

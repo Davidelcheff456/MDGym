@@ -2203,8 +2203,12 @@ function mdgymExerciseBlock(ex) {
 }
 
 // Para movilidad/cardio no tenemos un diagrama muscular real (no son un
-// musculo puntual sino un tipo de movimiento), asi que en vez de una foto
-// mostramos un icono generico coherente con el resto de la interfaz.
+// musculo puntual sino un tipo de movimiento). Para que el thumbnail/visual
+// principal sea consistente con el resto (una foto real, no un dibujo
+// lineal), usamos la primera foto real de ejecucion del propio ejercicio
+// (howto_images) cuando existe. El icono generico queda solo como ultimo
+// recurso, para el puñado de ejercicios de este grupo que todavia no
+// tienen ninguna foto real disponible.
 function mdgymMuscleGroupIcon(muscleGroup) {
   if (muscleGroup === "movilidad") return "stretch";
   if (muscleGroup === "cardio") return "heartbeat";
@@ -2214,18 +2218,30 @@ function mdgymMuscleGroupIcon(muscleGroup) {
 // HTML para el thumbnail chico (card de ejercicio, 64x64).
 function mdgymExerciseThumbHtml(ex, size) {
   const iconName = mdgymMuscleGroupIcon(ex.muscle_group);
-  return iconName
-    ? window.mdgymIcon(iconName, size || 30)
-    : `<img src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" loading="lazy" />`;
+  if (iconName) {
+    const firstPhoto = ex.howto_images && ex.howto_images[0];
+    return firstPhoto
+      ? `<img src="${firstPhoto}" alt="${ex.name_es}" loading="lazy" />`
+      : window.mdgymIcon(iconName, size || 30);
+  }
+  return `<img src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" loading="lazy" />`;
 }
 
 // HTML para la imagen grande del modal de detalle (reemplaza el <img> de
-// diagrama muscular por un icono centrado del mismo tamaño cuando no aplica).
+// diagrama muscular por un icono centrado cuando no aplica). Para
+// movilidad/cardio, si el ejercicio ya tiene fotos reales, esta imagen
+// grande se omite (devuelve "") porque la galeria de mas abajo (gallery,
+// en openExerciseDetail) ya muestra esas mismas fotos: mostrarla de nuevo
+// aca arriba seria repetir la primera foto dos veces en el mismo modal.
+// El icono generico solo aparece si el ejercicio todavia no tiene ninguna
+// foto real (por ahora, unicamente Cardio_Burpees).
 function mdgymExerciseModalVisualHtml(ex) {
   const iconName = mdgymMuscleGroupIcon(ex.muscle_group);
-  return iconName
-    ? `<div class="modal-muscle-img modal-muscle-icon">${window.mdgymIcon(iconName, 56)}</div>`
-    : `<img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />`;
+  if (iconName) {
+    const hasPhoto = ex.howto_images && ex.howto_images.length;
+    return hasPhoto ? "" : `<div class="modal-muscle-img modal-muscle-icon">${window.mdgymIcon(iconName, 56)}</div>`;
+  }
+  return `<img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />`;
 }
 
 function finishDay(profile, day, dayIdx) {

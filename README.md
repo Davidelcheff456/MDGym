@@ -10,15 +10,19 @@ registrar el peso usado en cada ejercicio dia a dia.
   rutina y el historial se guardan con `localStorage` en el dispositivo/navegador
   donde lo uses. Si cambias de celular/PC o borras el cache del sitio, se pierde
   ese historial (no hay sincronizacion en la nube en esta version).
-- La base de ~77 ejercicios (nombre, musculo, equipo especifico, instrucciones)
+- La base de ~93 ejercicios (nombre, musculo, equipo especifico, instrucciones)
   viene originalmente del dataset publico [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
   (licencia Unlicense / dominio publico); los nombres en espanol, el equipo
   detallado (maquina por maquina) y las instrucciones fueron redactados a mano.
-- Cada ejercicio muestra un diagrama anatomico real (silueta con el musculo
-  trabajado resaltado) y, para 30 de los 77 ejercicios, hasta 3 fotos reales de
-  ejecucion. Ambos vienen de la API publica de [wger.de](https://wger.de), bajo
-  licencia CC-BY-SA 3.0/4.0 o CC0 segun la imagen — ver el detalle completo de
-  autores y licencias abajo, y dentro de la app en Configuracion → Creditos.
+- Los ejercicios de musculo especifico muestran un diagrama anatomico real
+  (silueta con el musculo trabajado resaltado, de la API publica de
+  [wger.de](https://wger.de), licencia CC-BY-SA 3.0/4.0 o CC0 segun la imagen).
+  Los de movilidad y cardio no tienen un musculo puntual, asi que en su lugar
+  usan directamente su propia foto real de ejecucion como imagen principal.
+  En total, 92 de los ~93 ejercicios tienen hasta 3 fotos reales de ejecucion
+  (de wger.de o de free-exercise-db, segun el ejercicio) — ver el detalle
+  completo de autores y licencias abajo, y dentro de la app en Configuracion →
+  Creditos.
 - El equipamiento se elige maquina por maquina (prensa de piernas, polea alta,
   maquina Smith, etc.), no como categoria generica, para que la rutina se ajuste
   a lo que realmente tenes en tu gym.
@@ -114,7 +118,9 @@ muevas de lugar, ya viene incluida).
 - No hay cuenta ni respaldo en la nube: si queres pasar tu historial a otro
   dispositivo, por ahora no hay forma automatica (se podria agregar un
   exportar/importar `.json` mas adelante).
-- Solo 30 de los 77 ejercicios tienen fotos reales de ejecucion (los otros 47
-  no tenian una coincidencia confiable en wger.de, asi que preferimos no
-  mostrar una foto incorrecta antes que arriesgar el formato). Se pueden ir
-  sumando mas a mano en `js/data-exercises.js` (campo `howto_images`).
+- Un solo ejercicio (Burpees) todavia no tiene fotos reales de ejecucion: no
+  encontramos una coincidencia confiable ni en free-exercise-db ni en
+  wger.de (que ademas esta bloqueando pedidos automatizados con un desafio
+  anti-bots al momento de escribir esto), asi que preferimos no mostrar una
+  foto incorrecta antes que arriesgar el formato. Se puede ir sumando a mano
+  en `js/data-exercises.js` (campo `howto_images`).
