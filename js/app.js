@@ -1561,6 +1561,9 @@ function renderHome() {
       : "";
 
   const editToggleHtml = `<button class="btn btn-secondary" id="btn-toggle-edit" style="margin:12px 0 4px;">${isEditingDay ? "Listo" : "Editar ejercicios de este dia"}</button>`;
+  const addExerciseHtml = isEditingDay
+    ? `<button class="btn btn-secondary" id="btn-add-exercise" style="margin:10px 0 4px;">+ Agregar ejercicio</button>`
+    : "";
 
   // clave por dia + lista de musculos faltantes: si cambia el equipo y
   // aparece una situacion de "falta X" distinta, se vuelve a mostrar aunque
@@ -1591,6 +1594,7 @@ function renderHome() {
     ${editToggleHtml}
     ${homeSuggestionHtml}
     ${exCards}
+    ${addExerciseHtml}
     <div class="finish-bar-spacer"></div>
   `;
 
@@ -1696,6 +1700,8 @@ function renderHome() {
         renderHome();
       })
     );
+    const addExerciseBtn = document.getElementById("btn-add-exercise");
+    if (addExerciseBtn) addExerciseBtn.addEventListener("click", () => openHomeExercisePicker(dayIdx));
   }
   const dismissSuggestionBtn = document.getElementById("btn-dismiss-suggestion");
   if (dismissSuggestionBtn) {
@@ -1740,6 +1746,94 @@ function renderHome() {
       p.rotationDismissedUntil = d.toISOString().slice(0, 10);
       MDGymStore.saveProfile(p);
       renderHome();
+    });
+  }
+}
+
+// Modal para agregar un ejercicio a un dia YA generado (mientras se esta
+// editando en la pestaña Rutina/Inicio). Mismo patron visual que el
+// selector de "Modo Manual" (openManualExercisePicker), pero opera sobre
+// el perfil guardado en vez de STATE.manualBuild, y excluye los ejercicios
+// que el dia ya tiene (para no terminar con 2 cards del mismo ejercicio).
+// El ejercicio se agrega SIN customSets/customReps/customRestSec propios,
+// asi hereda series/reps/descanso del esquema general del dia (igual que
+// el resto de los ejercicios generados automaticamente). Si ya entrenaste
+// ese ejercicio antes, la card lo va a mostrar con "ultima vez: X kg" y va
+// a prellenar el peso sugerido en base a esa sesion pasada (misma logica
+// que ya usa cada ejercicio de la rutina, no hace falta nada especial).
+function openHomeExercisePicker(dayIdx) {
+  const profile = MDGymStore.getProfile();
+  const day = profile.routine[dayIdx];
+  const alreadyIn = new Set(day.exercises.map((e) => e.id));
+  const equipmentList = profile.equipment || [];
+  const pool = window.MDGYM_EXERCISES.filter(
+    (e) => equipmentList.includes(e.equipment) && !alreadyIn.has(e.id)
+  );
+  const groups = {};
+  pool.forEach((e) => {
+    groups[e.muscle_group] = groups[e.muscle_group] || [];
+    groups[e.muscle_group].push(e);
+  });
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Agregar ejercicio</div>
+          <div class="modal-sub">Filtrado por tu equipamiento · Dia ${dayIdx + 1}</div>
+        </div>
+        <button class="icon-btn" id="btn-close-picker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div class="field"><input type="text" id="picker-search" placeholder="Buscar ejercicio..." /></div>
+      <div id="picker-list">
+        ${
+          Object.keys(groups).length
+            ? Object.keys(groups)
+                .map(
+                  (g) => `
+          <div class="equip-group-title">${capitalize(g)}</div>
+          ${groups[g].map((e) => `<div class="link-row" data-pick="${e.id}"><span>${e.name_es}</span><span class="badge">${e.equipment_es}</span></div>`).join("")}
+        `
+                )
+                .join("")
+            : `<p class="note">No quedan mas ejercicios disponibles con tu equipamiento actual para agregar a este dia.</p>`
+        }
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-picker").addEventListener("click", close);
+  backdrop.querySelectorAll("[data-pick]").forEach((row) =>
+    row.addEventListener("click", () => {
+      const exId = row.dataset.pick;
+      const ex = window.MDGYM_EXERCISES.find((e) => e.id === exId);
+      if (!ex) return;
+      const p = MDGymStore.getProfile();
+      const d = p.routine[dayIdx];
+      if (d.exercises.some((e) => e.id === exId)) {
+        close();
+        return;
+      }
+      d.exercises.push({ ...ex });
+      MDGymStore.saveProfile(p);
+      close();
+      renderHome();
+    })
+  );
+  const searchInput = backdrop.querySelector("#picker-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      const q = e.target.value.trim().toLowerCase();
+      backdrop.querySelectorAll("[data-pick]").forEach((row) => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+      });
     });
   }
 }
