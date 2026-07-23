@@ -856,6 +856,16 @@ button, input, select {
 .week-status.week-ongoing { background: var(--bg-elevated-2); color: var(--text-muted); }
 .week-status.week-before { background: var(--bg-elevated-2); color: var(--text-muted); }
 
+/* Fila de semana clickeable: abre el detalle (entrenamientos ya cargados +
+   dias vacios para completar la meta). Semanas futuras no llevan esta clase
+   (todavia no hay nada que cargar), asi que quedan sin cursor/hover. */
+.week-row.week-row-clickable { cursor: pointer; }
+.week-row.week-row-clickable:active { opacity: .7; }
+.week-row.week-row-clickable:hover { background: var(--bg-elevated-2); }
+
+/* ---- detalle de semana (modal abierto desde una fila de arriba) ---- */
+.week-detail-row.week-detail-placeholder span:first-child { color: var(--text-muted); }
+
 /* ---------- Mensajes motivadores (dia / semana) ---------- */
 .motivation-card {
   display: flex;

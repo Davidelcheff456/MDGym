@@ -2417,8 +2417,11 @@ function renderMonthView() {
     } else {
       statusHtml = `<span class="week-status week-notmet">No llegaste a la meta</span>`;
     }
+    // Las semanas futuras no tienen ninguna fecha "cargable" todavia, asi
+    // que no las hacemos clickeables (mismo criterio que los dias futuros
+    // del calendario de arriba).
     return `
-      <div class="week-row">
+      <div class="week-row ${isFuture ? "" : "week-row-clickable"}" ${isFuture ? "" : `data-weekstart="${startIso}" data-weekend="${endIso}"`}>
         <div>
           <div class="week-range">${mdgymFormatShortDate(w.start)} al ${mdgymFormatShortDate(w.end)}</div>
           <div class="week-count">${trainedCount}/${goal} dia${goal === 1 ? "" : "s"} entrenado${trainedCount === 1 ? "" : "s"}</div>
@@ -2470,6 +2473,14 @@ function renderMonthView() {
     if (!cell.dataset.caldate) return;
     cell.addEventListener("click", () => openDayLogModal(cell.dataset.caldate));
   });
+
+  // Tocar una fila de "Cumplimiento semanal" abre el detalle de esa semana:
+  // los entrenamientos que ya tenes cargados (editables), mas espacios
+  // vacios hasta completar tu meta de dias/semana para poder sumar
+  // entrenamientos que ya hiciste pero todavia no cargaste.
+  root.querySelectorAll(".week-row[data-weekstart]").forEach((row) => {
+    row.addEventListener("click", () => openWeekDetailModal(row.dataset.weekstart, row.dataset.weekend));
+  });
 }
 
 // ============================================================
@@ -2479,12 +2490,20 @@ function renderMonthView() {
 // paso, sacar ejercicios cargados por error, ajustar reps/kg, o borrar el
 // entrenamiento entero. Trabaja sobre una copia local (JSON.parse/stringify)
 // y recien pisa lo guardado cuando se toca "Guardar".
-function openDayLogModal(dateStr) {
+function openDayLogModal(dateStr, prefillExercises) {
   const profile = MDGymStore.getProfile();
   if (!profile) return;
   const scheme = profile.goalScheme || { sets: 3, reps: 10, restSec: 75 };
   const existingSession = MDGymStore.getSessionByDate(dateStr);
-  let exercises = existingSession ? JSON.parse(JSON.stringify(existingSession.exercises || [])) : [];
+  // Si ya hay una sesion guardada para este dia, siempre gana esa (no
+  // pisamos algo que ya cargaste con un prellenado). El prellenado
+  // (prefillExercises) solo se usa cuando el dia todavia esta vacio: viene
+  // de "usar un dia de mi plan actual" desde el detalle de semana en Mes.
+  let exercises = existingSession
+    ? JSON.parse(JSON.stringify(existingSession.exercises || []))
+    : prefillExercises
+    ? JSON.parse(JSON.stringify(prefillExercises))
+    : [];
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -2493,7 +2512,13 @@ function openDayLogModal(dateStr) {
       <div class="modal-header">
         <div>
           <div class="modal-title">${formatDateEs(dateStr)}</div>
-          <div class="modal-sub">${existingSession ? "Editar entrenamiento" : "Registrar entrenamiento de este dia"}</div>
+          <div class="modal-sub">${
+            existingSession
+              ? "Editar entrenamiento"
+              : prefillExercises
+              ? "Revisa y ajusta el peso de cada ejercicio, despues guarda"
+              : "Registrar entrenamiento de este dia"
+          }</div>
         </div>
         <button class="icon-btn" id="btn-close-daylog" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
       </div>
@@ -2746,6 +2771,193 @@ function openDayLogExercisePicker(profile, dateStr, currentExercises, onPick) {
       });
     });
   }
+}
+
+// ============================================================
+// DETALLE DE SEMANA (desde "Cumplimiento semanal" en Mes)
+// ============================================================
+// Al tocar una fila de semana: mostramos los entrenamientos ya cargados esa
+// semana (clickeables, para editarlos igual que desde el calendario), mas
+// "espacios" vacios hasta completar la meta semanal (profile.daysPerWeek),
+// para los dias reales de esa semana que todavia no tenes registrados. Si
+// ya cargaste mas dias que la meta, esos dias de mas tambien se muestran
+// (no los ocultamos: cumpliste y ademas entrenaste extra).
+function openWeekDetailModal(startIso, endIso) {
+  const profile = MDGymStore.getProfile();
+  if (!profile) return;
+  const goal = profile.daysPerWeek || 1;
+  const todayStr = todayISO();
+
+  const sessions = MDGymStore.getSessions()
+    .filter((s) => s.date >= startIso && s.date <= endIso)
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+  const usedDates = new Set(sessions.map((s) => s.date));
+
+  // Dias reales de la semana (ni futuros ni ya usados) que podrian recibir
+  // un entrenamiento "cargado despues". Se ofrecen en orden cronologico
+  // hasta completar la meta que falte.
+  const candidateDates = [];
+  const cursor = new Date(startIso + "T00:00:00");
+  const endDate = new Date(endIso + "T00:00:00");
+  while (cursor <= endDate) {
+    const iso = mdgymDateToISO(cursor);
+    if (iso <= todayStr && !usedDates.has(iso)) candidateDates.push(iso);
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  const placeholdersNeeded = Math.max(0, goal - sessions.length);
+  const placeholderDates = candidateDates.slice(0, placeholdersNeeded);
+
+  const sessionRowsHtml = sessions
+    .map((s) => {
+      const pct = mdgymSessionCompletionPct(s);
+      return `<div class="link-row week-detail-row" data-weekdetaildate="${s.date}">
+        <span>${formatDateEs(s.date)}</span>
+        <span class="badge">${pct}% completado</span>
+      </div>`;
+    })
+    .join("");
+  const placeholderRowsHtml = placeholderDates
+    .map(
+      (iso) => `<div class="link-row week-detail-row week-detail-placeholder" data-weekdetaildate="${iso}">
+        <span>${formatDateEs(iso)}</span>
+        <span class="badge badge-warn">Sin registrar</span>
+      </div>`
+    )
+    .join("");
+  const emptyNote =
+    !sessions.length && !placeholderDates.length
+      ? `<p class="note">Esta semana todavia no tiene ningun dia disponible para cargar.</p>`
+      : "";
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">${mdgymFormatShortDate(new Date(startIso + "T00:00:00"))} al ${mdgymFormatShortDate(new Date(endIso + "T00:00:00"))}</div>
+          <div class="modal-sub">Meta: ${goal} dia${goal === 1 ? "" : "s"} por semana</div>
+        </div>
+        <button class="icon-btn" id="btn-close-weekdetail" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="weekdetail-list">${sessionRowsHtml}${placeholderRowsHtml}${emptyNote}</div>
+      ${placeholderDates.length ? `<p class="note" style="margin-top:10px;">Los dias "Sin registrar" son dias reales de esta semana en los que todavia no cargaste nada: tocalos para agregar lo que hiciste.</p>` : ""}
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-weekdetail").addEventListener("click", close);
+
+  backdrop.querySelectorAll("[data-weekdetaildate]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const dateStr = row.dataset.weekdetaildate;
+      close();
+      if (usedDates.has(dateStr)) {
+        openDayLogModal(dateStr);
+      } else {
+        mdgymChooseDayLoadMethod(profile, dateStr);
+      }
+    });
+  });
+}
+
+// Para un dia sin registrar dentro de una semana pasada: preguntamos si
+// prellenar con un dia del plan actual (y despues dejar ajustar peso/reps)
+// o directamente armar el entrenamiento ejercicio por ejercicio desde cero.
+function mdgymChooseDayLoadMethod(profile, targetDate) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">${formatDateEs(targetDate)}</div>
+          <div class="modal-sub">¿Como queres cargar este entrenamiento?</div>
+        </div>
+        <button class="icon-btn" id="btn-close-loadmethod" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <button class="btn btn-primary" id="btn-loadmethod-plan" style="width:100%; margin-bottom:10px;">Usar un dia de mi plan actual</button>
+      <button class="btn btn-secondary" id="btn-loadmethod-manual" style="width:100%;">Agregar ejercicio por ejercicio</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-loadmethod").addEventListener("click", close);
+  backdrop.querySelector("#btn-loadmethod-plan").addEventListener("click", () => {
+    close();
+    openPlanDayPicker(profile, targetDate);
+  });
+  backdrop.querySelector("#btn-loadmethod-manual").addEventListener("click", () => {
+    close();
+    openDayLogModal(targetDate);
+  });
+}
+
+// Lista los dias de la rutina actual (Dia 1, Dia 2...) para elegir cual
+// prellenar en targetDate. El peso de cada set se sugiere con el ultimo
+// registro de ese ejercicio antes de targetDate (mismo criterio que el
+// resto de la app), no queda en blanco a proposito.
+function openPlanDayPicker(profile, targetDate) {
+  const scheme = profile.goalScheme || { sets: 3, reps: 10, restSec: 75 };
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Elegi el dia de tu plan</div>
+          <div class="modal-sub">Se precargan sus ejercicios en ${formatDateEs(targetDate)}</div>
+        </div>
+        <button class="icon-btn" id="btn-close-plandaypicker" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="plandaypicker-list">
+        ${profile.routine
+          .map(
+            (d, i) => `
+          <div class="link-row" data-plandayidx="${i}">
+            <span>Dia ${i + 1} · ${d.label}</span>
+            <span class="badge">${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"}</span>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-plandaypicker").addEventListener("click", close);
+
+  backdrop.querySelectorAll("[data-plandayidx]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const day = profile.routine[Number(row.dataset.plandayidx)];
+      const prefillExercises = day.exercises.map((ex) => {
+        const exSets = ex.customSets != null ? ex.customSets : scheme.sets;
+        const exReps = ex.customReps != null ? ex.customReps : scheme.reps;
+        const lastBefore = MDGymStore.getLastWeightForExercise(ex.id, targetDate);
+        const sets = Array.from({ length: exSets }, () => ({
+          reps: exReps,
+          weightKg: lastBefore ? lastBefore.weightKg : null,
+          done: false,
+        }));
+        return { exerciseId: ex.id, name_es: ex.name_es, sets };
+      });
+      close();
+      openDayLogModal(targetDate, prefillExercises);
+    });
+  });
 }
 
 function renderCompletionChartSvg(sessions) {
