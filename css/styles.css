@@ -570,6 +570,52 @@ button, input, select {
   color: var(--text-muted);
 }
 .day-pill.today { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-text); border-color: var(--accent); box-shadow: 0 4px 14px -6px var(--accent); }
+.day-pill { cursor: pointer; }
+.day-pill.day-pill-add {
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--accent);
+  font-size: 15px;
+  font-weight: 800;
+  padding: 10px 16px;
+}
+.day-pill.day-pill-add:active { opacity: .7; }
+
+/* Link chico tipo texto (ej. "Asignar dias de la semana"), sin fondo ni
+   borde, para acciones secundarias que no necesitan un boton completo. */
+.btn-linklike {
+  display: block;
+  background: none;
+  border: none;
+  padding: 8px 2px 4px;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: left;
+  cursor: pointer;
+}
+.btn-linklike:active { opacity: .7; }
+
+/* ---- modal "Dias de la semana" (asignar Dia N a un dia real) ---- */
+.assign-weekday-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.assign-weekday-row:last-child { border-bottom: none; }
+.assign-weekday-row span { font-size: 13.5px; font-weight: 600; }
+.assign-weekday-row select {
+  background: var(--bg-elevated-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
 
 .section-title { font-size: 17px; font-weight: 800; margin: 6px 0 12px; }
 

@@ -64,6 +64,16 @@ function formatDateEs(iso) {
   return d.toLocaleDateString("es-AR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+// ------------------------------------------------------------
+// Dias de la semana: 0=Lunes..6=Domingo (mismo criterio que el resto de la
+// app, ej. mdgymGetWeekRangesForMonth usa "(date.getDay()+6)%7"). Sirve
+// para poder asignarle un dia de la semana real a "Dia 1", "Dia 2", etc.
+// de la rutina (solo a modo de etiqueta: no cambia el orden en que la app
+// va rotando los dias, eso lo sigue decidiendo nextDayIndex como siempre).
+// ------------------------------------------------------------
+const MDGYM_WEEKDAY_LABELS = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+const MDGYM_WEEKDAY_SHORT = ["Lun", "Mar", "Mie", "Jue", "Vie", "Sab", "Dom"];
+
 // Saca tildes/diacriticos y pasa a minusculas, para que buscar "musculo" o
 // "músculo" (o cualquier combinacion con/sin acento) de el mismo resultado.
 function mdgymNormalizeSearch(s) {
@@ -127,6 +137,20 @@ function mdgymGetWeekRangeForDate(dateObj) {
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
   return { start, end };
+}
+
+// Si un dia de la rutina tiene asignado un dia de la semana (ej. "Dia 1 =
+// Lunes"), el entrenamiento se guarda con la fecha de ESE dia dentro de la
+// semana actual (el lunes de esta semana), no con la fecha de hoy: si hoy
+// es jueves pero estas completando el "Dia 1" que asignaste a lunes, el
+// registro tiene que quedar prolijo en el calendario como si fuera lunes.
+// Si el dia no tiene un dia de la semana asignado, se usa hoy como siempre.
+function mdgymDateForWeekdayThisWeek(weekdayIdx) {
+  const today = new Date(todayISO() + "T00:00:00");
+  const weekRange = mdgymGetWeekRangeForDate(today);
+  const d = new Date(weekRange.start);
+  d.setDate(d.getDate() + weekdayIdx);
+  return mdgymDateToISO(d);
 }
 
 // Una serie se considera "hecha" si tiene el flag explicito, o (para datos
@@ -1504,7 +1528,12 @@ function renderHome() {
   const day = profile.routine[dayIdx];
   const scheme = profile.goalScheme;
   const today = todayISO();
-  const existingSession = MDGymStore.getSessionByDate(today);
+  // Si este dia tiene un dia de la semana asignado, su entrenamiento vive
+  // bajo la fecha de ESE dia en la semana actual (no la de hoy): por eso lo
+  // buscamos ahi, tanto para saber si ya lo completaste (boton "Actualizar"
+  // vs "Finalizar") como para prellenar lo que ya hayas guardado.
+  const targetDate = day.weekday != null ? mdgymDateForWeekdayThisWeek(day.weekday) : today;
+  const existingSession = MDGymStore.getSessionByDate(targetDate);
 
   // Mensaje motivador semanal: si con el entreno de HOY se cierra la meta
   // de dias/semana (y hoy todavia no esta guardado), mostramos un empujon.
@@ -1534,9 +1563,14 @@ function renderHome() {
     return;
   }
 
-  const pillsRow = profile.routine
-    .map((d, i) => `<div class="day-pill ${i === dayIdx ? "today" : ""}" data-dayidx="${i}">Dia ${i + 1}</div>`)
-    .join("");
+  const pillsRow =
+    profile.routine
+      .map((d, i) => {
+        const wd = d.weekday != null ? ` · ${MDGYM_WEEKDAY_SHORT[d.weekday]}` : "";
+        return `<div class="day-pill ${i === dayIdx ? "today" : ""}" data-dayidx="${i}">Dia ${i + 1}${wd}</div>`;
+      })
+      .join("") +
+    `<div class="day-pill day-pill-add" id="btn-add-extra-day" title="Agregar un dia de entreno extra">+</div>`;
 
   // si el mismo dayType se repite mas de una vez en la semana (ej: "full"
   // en un split de 3 dias), usamos una variante distinta para cada
@@ -1683,6 +1717,9 @@ function renderHome() {
 
   root.innerHTML = `
     <div class="day-pill-row">${pillsRow}</div>
+    <button type="button" class="btn-linklike" id="btn-assign-weekdays">${
+      day.weekday != null ? `Dia ${dayIdx + 1} es ${MDGYM_WEEKDAY_LABELS[day.weekday]} · cambiar` : "Asignar dias de la semana a tu rutina"
+    }</button>
     <div class="rest-timer-bar" id="rest-timer" style="display:none;">
       <span class="rest-timer-label">${window.mdgymIcon("tip", 15)} Descanso</span>
       <span class="rest-timer-clock" id="rest-timer-clock">0:00</span>
@@ -1724,6 +1761,9 @@ function renderHome() {
       renderHome();
     })
   );
+
+  document.getElementById("btn-assign-weekdays").addEventListener("click", () => openAssignWeekdaysModal(profile));
+  document.getElementById("btn-add-extra-day").addEventListener("click", () => mdgymStartAddExtraDay(profile));
 
   document.getElementById("btn-finish-day").addEventListener("click", () => finishDay(profile, day, dayIdx));
 
@@ -2256,6 +2296,238 @@ function mdgymExerciseModalVisualHtml(ex) {
   return `<img class="modal-muscle-img" src="assets/muscles/${ex.muscle_group}.png" alt="${capitalize(ex.muscle_group)}" />`;
 }
 
+// ============================================================
+// ASIGNAR DIA DE LA SEMANA A CADA "DIA N" DE LA RUTINA
+// ============================================================
+// Es solo una etiqueta (ej. "Dia 1 = Lunes"): no cambia el orden en que la
+// app va rotando los dias despues de cada entrenamiento (eso lo sigue
+// decidiendo nextDayIndex, como siempre) ni obliga a entrenar ese dia
+// especifico. Sirve para que quede claro, en la propia rutina y en el
+// calendario de Mes, que dia de la semana corresponde a cada numero.
+function openAssignWeekdaysModal(profile) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Dias de la semana</div>
+          <div class="modal-sub">Es solo una etiqueta: no cambia el orden en que van rotando tus dias</div>
+        </div>
+        <button class="icon-btn" id="btn-close-assignweekdays" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="assignweekdays-list">
+        ${profile.routine
+          .map(
+            (d, i) => `
+          <div class="assign-weekday-row">
+            <span>Dia ${i + 1} &middot; ${d.label}</span>
+            <select data-weekdaysel="${i}">
+              <option value="">Sin asignar</option>
+              ${MDGYM_WEEKDAY_LABELS.map(
+                (lbl, wi) => `<option value="${wi}" ${d.weekday === wi ? "selected" : ""}>${lbl}</option>`
+              ).join("")}
+            </select>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+      <button class="btn btn-primary" id="btn-save-weekdays" style="width:100%; margin-top:14px;">Guardar</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-assignweekdays").addEventListener("click", close);
+
+  backdrop.querySelector("#btn-save-weekdays").addEventListener("click", () => {
+    const p = MDGymStore.getProfile();
+    backdrop.querySelectorAll("[data-weekdaysel]").forEach((sel) => {
+      const idx = Number(sel.dataset.weekdaysel);
+      const val = sel.value;
+      if (p.routine[idx]) p.routine[idx].weekday = val === "" ? null : Number(val);
+    });
+    MDGymStore.saveProfile(p);
+    close();
+    renderHome();
+  });
+}
+
+// ============================================================
+// AGREGAR UN DIA DE ENTRENO EXTRA (boton "+" al lado de las pestañas de dia)
+// ============================================================
+// Paso 1: elegir si el dia extra es solo para esta semana (no queda en tu
+// rutina de siempre, es un entreno de una sola vez) o tambien para las
+// semanas que vienen (se suma como un "Dia N+1" permanente y tu meta
+// semanal de dias/semana sube en uno).
+function mdgymStartAddExtraDay(profile) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Agregar un dia de entreno</div>
+          <div class="modal-sub">¿Es solo por esta semana o tambien para las que vienen?</div>
+        </div>
+        <button class="icon-btn" id="btn-close-extraday-scope" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <button class="btn btn-secondary" id="btn-extraday-onceonly" style="width:100%; margin-bottom:10px;">Solo por esta semana</button>
+      <button class="btn btn-primary" id="btn-extraday-permanent" style="width:100%;">Tambien para las proximas semanas</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-extraday-scope").addEventListener("click", close);
+  backdrop.querySelector("#btn-extraday-onceonly").addEventListener("click", () => {
+    close();
+    mdgymPickExtraDayType(profile, false);
+  });
+  backdrop.querySelector("#btn-extraday-permanent").addEventListener("click", () => {
+    close();
+    mdgymPickExtraDayType(profile, true);
+  });
+}
+
+// Paso 2: elegir el tipo de dia (las mismas 6 plantillas que usa el
+// generador automatico: cuerpo completo, tren superior, etc.). Es la forma
+// mas simple de que la app arme los ejercicios sola para este dia nuevo,
+// tal como contestaste que preferias.
+function mdgymPickExtraDayType(profile, permanent) {
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const types = Object.keys(window.MDGYM_DAY_TEMPLATES);
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">¿Que tipo de dia?</div>
+          <div class="modal-sub">La app arma los ejercicios sola segun tu equipamiento</div>
+        </div>
+        <button class="icon-btn" id="btn-close-extraday-type" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="extraday-type-list">
+        ${types
+          .map(
+            (t) => `<div class="link-row" data-extradaytype="${t}"><span>${window.MDGYM_DAY_TEMPLATES[t].label}</span></div>`
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-extraday-type").addEventListener("click", close);
+  backdrop.querySelectorAll("[data-extradaytype]").forEach((row) =>
+    row.addEventListener("click", () => {
+      const dayType = row.dataset.extradaytype;
+      close();
+      mdgymBuildAndLogExtraDay(profile, dayType, permanent);
+    })
+  );
+}
+
+// Paso 3: arma los ejercicios del dia nuevo con el mismo generador que usa
+// el resto de la rutina. Si es permanente, lo suma al final de
+// profile.routine y sube profile.daysPerWeek en uno (asi tambien cuenta
+// para la meta semanal que se ve en Mes). En los dos casos, despues pasa a
+// elegir en que fecha de esta semana se registra ese entrenamiento.
+function mdgymBuildAndLogExtraDay(profile, dayType, permanent) {
+  const equipmentList = profile.equipment || [];
+  const wantMobility = mdgymProfileWantsMobility(profile);
+  const built = window.mdgymBuildDay(dayType, equipmentList, profile.weekIndex || 0, wantMobility);
+
+  let dayIndexForLog = null;
+  let freshProfile = profile;
+  if (permanent) {
+    const p = MDGymStore.getProfile();
+    p.routine.push({ dayType, label: built.label, exercises: built.exercises, missing: built.missing, weekday: null });
+    p.daysPerWeek = p.routine.length;
+    MDGymStore.saveProfile(p);
+    dayIndexForLog = p.routine.length - 1;
+    freshProfile = p;
+  }
+
+  mdgymPickExtraDayDate(freshProfile, built, dayIndexForLog);
+}
+
+// Paso 4: elegir a que dia real de ESTA semana (de lunes a hoy, sin fechas
+// futuras) corresponde este entrenamiento extra, y abrir el editor de dia
+// (el mismo que se usa desde Mes) ya precargado con los ejercicios armados
+// y el peso sugerido segun tu ultimo registro de cada uno.
+function mdgymPickExtraDayDate(profile, built, dayIndexForLog) {
+  const todayStr = todayISO();
+  const weekRange = mdgymGetWeekRangeForDate(new Date(todayStr + "T00:00:00"));
+  const startIso = mdgymDateToISO(weekRange.start);
+  const dates = [];
+  const cursor = new Date(startIso + "T00:00:00");
+  const todayDate = new Date(todayStr + "T00:00:00");
+  while (cursor <= todayDate) {
+    dates.push(mdgymDateToISO(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  const scheme = profile.goalScheme || { sets: 3, reps: 10, restSec: 75 };
+  const prefillExercises = built.exercises.map((ex) => {
+    const lastBefore = MDGymStore.getLastWeightForExercise(ex.id, todayStr);
+    const sets = Array.from({ length: scheme.sets }, () => ({
+      reps: scheme.reps,
+      weightKg: lastBefore ? lastBefore.weightKg : null,
+      done: false,
+    }));
+    return { exerciseId: ex.id, name_es: ex.name_es, sets };
+  });
+
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  backdrop.innerHTML = `
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">¿Que dia lo hiciste?</div>
+          <div class="modal-sub">${built.label} &middot; elegi un dia de esta semana</div>
+        </div>
+        <button class="icon-btn" id="btn-close-extraday-date" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
+      </div>
+      <div id="extraday-date-list">
+        ${dates
+          .map(
+            (iso) =>
+              `<div class="link-row" data-extradaydate="${iso}"><span>${formatDateEs(iso)}${iso === todayStr ? " (hoy)" : ""}</span></div>`
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  const close = () => backdrop.remove();
+  backdrop.addEventListener("click", (e) => {
+    if (e.target === backdrop) close();
+  });
+  backdrop.querySelector("#btn-close-extraday-date").addEventListener("click", close);
+  backdrop.querySelectorAll("[data-extradaydate]").forEach((row) =>
+    row.addEventListener("click", () => {
+      const dateStr = row.dataset.extradaydate;
+      close();
+      openDayLogModal(dateStr, prefillExercises, dayIndexForLog);
+      renderHome();
+    })
+  );
+}
+
 function finishDay(profile, day, dayIdx) {
   const root = document.getElementById("home-content");
   const exercisesLog = day.exercises.map((exData) => {
@@ -2276,9 +2548,10 @@ function finishDay(profile, day, dayIdx) {
   });
 
   const session = {
-    date: todayISO(),
+    date: day.weekday != null ? mdgymDateForWeekdayThisWeek(day.weekday) : todayISO(),
     dayType: day.dayType,
     dayLabel: day.label,
+    dayIndex: dayIdx,
     exercises: exercisesLog,
   };
   MDGymStore.upsertSession(session);
@@ -2395,8 +2668,17 @@ function renderMonthView() {
       pctHtml = `<span class="cal-pct">${pct}%</span>`;
     }
     const isFutureDay = dateStr > todayStr;
+    // Si la sesion de ese dia sabe a que "Dia N" de la rutina corresponde,
+    // lo sumamos al tooltip (ej. "2026-07-23 · Dia 2 (Martes)") para que
+    // tambien figure ahi que dia de la rutina fue, ademas de en el modal
+    // que se abre al tocarlo.
+    let cellTitle = dateStr;
+    if (session && session.dayIndex != null && profile.routine[session.dayIndex]) {
+      const sessDay = profile.routine[session.dayIndex];
+      cellTitle += ` · Dia ${session.dayIndex + 1}${sessDay.weekday != null ? ` (${MDGYM_WEEKDAY_LABELS[sessDay.weekday]})` : ""}`;
+    }
     cells.push(`
-      <div class="cal-cell ${session ? "cal-trained " + tierClass : ""} ${isToday ? "cal-today" : ""} ${isFutureDay ? "cal-future" : "cal-clickable"}" data-caldate="${isFutureDay ? "" : dateStr}" title="${dateStr}">
+      <div class="cal-cell ${session ? "cal-trained " + tierClass : ""} ${isToday ? "cal-today" : ""} ${isFutureDay ? "cal-future" : "cal-clickable"}" data-caldate="${isFutureDay ? "" : dateStr}" title="${cellTitle}">
         <span class="cal-daynum">${day}</span>
         ${pctHtml}
       </div>
@@ -2518,7 +2800,7 @@ function renderMonthView() {
 // paso, sacar ejercicios cargados por error, ajustar reps/kg, o borrar el
 // entrenamiento entero. Trabaja sobre una copia local (JSON.parse/stringify)
 // y recien pisa lo guardado cuando se toca "Guardar".
-function openDayLogModal(dateStr, prefillExercises) {
+function openDayLogModal(dateStr, prefillExercises, prefillDayIndex) {
   const profile = MDGymStore.getProfile();
   if (!profile) return;
   const scheme = profile.goalScheme || { sets: 3, reps: 10, restSec: 75 };
@@ -2526,12 +2808,27 @@ function openDayLogModal(dateStr, prefillExercises) {
   // Si ya hay una sesion guardada para este dia, siempre gana esa (no
   // pisamos algo que ya cargaste con un prellenado). El prellenado
   // (prefillExercises) solo se usa cuando el dia todavia esta vacio: viene
-  // de "usar un dia de mi plan actual" desde el detalle de semana en Mes.
+  // de "usar un dia de mi plan actual" desde el detalle de semana en Mes,
+  // o del boton "+" de agregar un dia extra.
   let exercises = existingSession
     ? JSON.parse(JSON.stringify(existingSession.exercises || []))
     : prefillExercises
     ? JSON.parse(JSON.stringify(prefillExercises))
     : [];
+
+  // A que "Dia N" de la rutina corresponde este entrenamiento (si se sabe):
+  // el de la sesion ya guardada, o el que vino prellenado. Se muestra en el
+  // subtitulo para que quede claro "en que dia fue" al mirarlo desde Mes.
+  const effectiveDayIndex =
+    existingSession && existingSession.dayIndex != null
+      ? existingSession.dayIndex
+      : prefillDayIndex != null
+      ? prefillDayIndex
+      : null;
+  const effectiveDay = effectiveDayIndex != null ? profile.routine[effectiveDayIndex] : null;
+  const dayRefHtml = effectiveDay
+    ? ` &middot; Dia ${effectiveDayIndex + 1}${effectiveDay.weekday != null ? ` (${MDGYM_WEEKDAY_LABELS[effectiveDay.weekday]})` : ""}`
+    : "";
 
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -2541,11 +2838,11 @@ function openDayLogModal(dateStr, prefillExercises) {
         <div>
           <div class="modal-title">${formatDateEs(dateStr)}</div>
           <div class="modal-sub">${
-            existingSession
+            (existingSession
               ? "Editar entrenamiento"
               : prefillExercises
               ? "Revisa y ajusta el peso de cada ejercicio, despues guarda"
-              : "Registrar entrenamiento de este dia"
+              : "Registrar entrenamiento de este dia") + dayRefHtml
           }</div>
         </div>
         <button class="icon-btn" id="btn-close-daylog" aria-label="Cerrar">${window.mdgymIcon("close", 18)}</button>
@@ -2697,6 +2994,7 @@ function openDayLogModal(dateStr, prefillExercises) {
       date: dateStr,
       dayType: existingSession ? existingSession.dayType : "retroactivo",
       dayLabel: existingSession ? existingSession.dayLabel : "Entrenamiento registrado",
+      dayIndex: effectiveDayIndex,
       exercises: cleanExercises,
     };
     MDGymStore.upsertSession(session);
@@ -2970,7 +3268,8 @@ function openPlanDayPicker(profile, targetDate) {
 
   backdrop.querySelectorAll("[data-plandayidx]").forEach((row) => {
     row.addEventListener("click", () => {
-      const day = profile.routine[Number(row.dataset.plandayidx)];
+      const chosenDayIdx = Number(row.dataset.plandayidx);
+      const day = profile.routine[chosenDayIdx];
       const prefillExercises = day.exercises.map((ex) => {
         const exSets = ex.customSets != null ? ex.customSets : scheme.sets;
         const exReps = ex.customReps != null ? ex.customReps : scheme.reps;
@@ -2983,7 +3282,7 @@ function openPlanDayPicker(profile, targetDate) {
         return { exerciseId: ex.id, name_es: ex.name_es, sets };
       });
       close();
-      openDayLogModal(targetDate, prefillExercises);
+      openDayLogModal(targetDate, prefillExercises, chosenDayIdx);
     });
   });
 }

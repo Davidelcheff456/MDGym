@@ -1614,6 +1614,8 @@ window.MDGYM_EXERCISES = [
   "mechanic": "compound",
   "instructions_es": "Desde parado, baja a cuclillas, apoya las manos y llevá los pies atras a posicion de plancha, volve a traerlos, y termina con un salto hacia arriba. Es un ejercicio exigente: ajusta el ritmo a tu nivel.",
   "howto_images": [
+   "assets/howto/Cardio_Burpees_1.jpg",
+   "assets/howto/Cardio_Burpees_2.jpg",
    "assets/howto/Cardio_Burpees_0.jpg"
   ]
  },
