@@ -45,6 +45,8 @@ const STATE = {
   dismissedMissing: new Set(), // avisos de "falta equipo para X" ya cerrados (clave: dayIdx + lista de musculos faltantes)
   equipmentPickMode: null, // null = mostrar los atajos (completo/basico/etc); "manual" = mostrar la checklist maquina por maquina
   pendingSharedRoutine: null, // != null mientras se completan los datos personales tras abrir un archivo de rutina compartida
+  dayInfoOpenForDay: null, // dayIdx para el que el panel de info (tips/avisos) esta desplegado en Inicio; null = colapsado
+  dayInfoOutsideClickWired: false, // si ya se engancho (una sola vez) el listener global que cierra el panel al tocar afuera
 };
 
 function todayISO() {
@@ -1963,12 +1965,17 @@ function renderHome() {
       <span class="rest-timer-clock" id="rest-timer-clock">0:00</span>
       <button type="button" class="btn btn-secondary" id="btn-skip-rest">Saltar</button>
     </div>
-    <div class="section-title" style="margin-top:14px;">Dia ${dayIdx + 1} &middot; ${day.label}</div>
-    <p class="note" style="margin-bottom:14px;">Descanso sugerido entre series: ~${scheme.restSec}s (se cuenta solo al marcar una serie hecha). Toca el circulo de cada serie cuando la termines. ¿Preferis hacer otro dia hoy? Tocá su pestaña arriba: el orden sigue solo desde ahi.</p>
-    ${dayTipHtml}
-    ${weekMotivationHtml}
-    ${suggestRotateHtml}
-    ${missingNote}
+    <button type="button" class="section-title day-title-toggle${STATE.dayInfoOpenForDay === dayIdx ? " open" : ""}" id="day-title-toggle" style="margin-top:14px;">
+      <span>Dia ${dayIdx + 1} &middot; ${day.label}</span>
+      <span class="day-title-toggle-chevron"></span>
+    </button>
+    <div class="day-info-panel${STATE.dayInfoOpenForDay === dayIdx ? " open" : ""}" id="day-info-panel">
+      <p class="note" style="margin-bottom:14px;">Descanso sugerido entre series: ~${scheme.restSec}s (se cuenta solo al marcar una serie hecha). Toca el circulo de cada serie cuando la termines. ¿Preferis hacer otro dia hoy? Tocá su pestaña arriba: el orden sigue solo desde ahi.</p>
+      ${dayTipHtml}
+      ${weekMotivationHtml}
+      ${suggestRotateHtml}
+      ${missingNote}
+    </div>
     <div id="day-motivation"></div>
     ${editToggleHtml}
     ${homeSuggestionHtml}
@@ -1976,6 +1983,37 @@ function renderHome() {
     ${addExerciseHtml}
     <div class="finish-bar-spacer"></div>
   `;
+
+  // Panel de info del dia (descanso sugerido, "por que este dia", avisos):
+  // arranca colapsado y se despliega tocando el titulo "Dia N - Label". Se
+  // togglea con clases (no con un renderHome() completo) para no perder
+  // valores de reps/kg que la persona ya haya tipeado pero todavia no
+  // guardado. El cierre "al tocar afuera" se resuelve con UN SOLO listener
+  // global en document (enganchado una unica vez en toda la vida de la
+  // app), que en cada click busca los elementos actuales por id -asi sigue
+  // funcionando bien aunque este dia se vuelva a renderizar despues-.
+  const dayTitleToggle = document.getElementById("day-title-toggle");
+  const dayInfoPanel = document.getElementById("day-info-panel");
+  if (dayTitleToggle && dayInfoPanel) {
+    dayTitleToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const isOpen = dayInfoPanel.classList.toggle("open");
+      dayTitleToggle.classList.toggle("open", isOpen);
+      STATE.dayInfoOpenForDay = isOpen ? dayIdx : null;
+    });
+  }
+  if (!STATE.dayInfoOutsideClickWired) {
+    STATE.dayInfoOutsideClickWired = true;
+    document.addEventListener("click", (e) => {
+      const panel = document.getElementById("day-info-panel");
+      const toggle = document.getElementById("day-title-toggle");
+      if (!panel || !panel.classList.contains("open")) return;
+      if (panel.contains(e.target) || (toggle && toggle.contains(e.target))) return;
+      panel.classList.remove("open");
+      if (toggle) toggle.classList.remove("open");
+      STATE.dayInfoOpenForDay = null;
+    });
+  }
 
   // El texto siempre es el mismo (no depende de si ya habia una sesion
   // guardada para ese dia/fecha): con o sin sesion previa, el boton dice

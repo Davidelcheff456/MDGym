@@ -647,6 +647,49 @@ button, input, select {
 
 .section-title { font-size: 17px; font-weight: 800; margin: 6px 0 12px; }
 
+/* Titulo "Dia N - Label" en Inicio: ahora es un boton que despliega/oculta
+   el panel de info del dia (tip, avisos, texto de ayuda) para no mostrar
+   todo ese texto siempre. */
+.day-title-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+.day-title-toggle:active { opacity: .75; }
+.day-title-toggle-chevron {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform .15s ease;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+.day-title-toggle.open .day-title-toggle-chevron { transform: rotate(-135deg); }
+
+/* Panel colapsable con el descanso sugerido, el tip "por que este dia",
+   avisos de equipo faltante, etc. - todo junto en un rectangulo con
+   bordes redondeados, oculto por defecto. */
+.day-info-panel {
+  display: none;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 14px 2px;
+  margin-bottom: 14px;
+}
+.day-info-panel.open { display: block; }
+.day-info-panel > .note:first-child { margin-top: 0; }
+
 /* Configuracion: cada seccion arranca colapsada (solo se ve el titulo) y
    se despliega al tocarlo, para no mostrar todas las opciones de una. */
 details.settings-section { margin: 0 0 4px; }
