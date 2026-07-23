@@ -1977,16 +1977,22 @@ function renderHome() {
     <div class="finish-bar-spacer"></div>
   `;
 
+  // El texto siempre es el mismo (no depende de si ya habia una sesion
+  // guardada para ese dia/fecha): con o sin sesion previa, el boton dice
+  // "Finalizar dia"/"Finalizar semana" y el click siempre guarda (crea o
+  // sobrescribe) la sesion de ese dia. Antes decia "Actualizar" cuando ya
+  // existia una sesion, pero como cada dispositivo tiene su propio
+  // historial (MDGym no tiene nube), el mismo dia podia mostrar un texto
+  // distinto en el celular que en la PC segun donde ya se hubiera
+  // guardado - confuso, aunque no era un bug de renderizado.
   const isLastDayOfWeek = dayIdx === profile.routine.length - 1;
-  const finishLabel = existingSession
-    ? (isLastDayOfWeek ? "Actualizar semana" : "Actualizar dia")
-    : (isLastDayOfWeek ? "Finalizar semana" : "Finalizar dia");
+  const finishLabel = isLastDayOfWeek ? "Finalizar semana" : "Finalizar dia";
   const finishBar = document.createElement("div");
   finishBar.className = "finish-bar";
   finishBar.innerHTML = `
     <button class="btn btn-modern" id="btn-finish-day">
       <span>${finishLabel}</span>
-      <span class="btn-modern-icon">${existingSession ? window.mdgymIcon("refresh", 18) : window.mdgymIcon("check", 18)}</span>
+      <span class="btn-modern-icon">${window.mdgymIcon("check", 18)}</span>
     </button>
   `;
   const oldBar = document.querySelector(".finish-bar");
