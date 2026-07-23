@@ -192,6 +192,20 @@ button, input, select {
 
 .brand .dot { color: var(--accent); }
 
+/* Saludo debajo del logo ("Bienvenido, {nombre}"). Vacio (sin perfil
+   todavia, ej. durante el onboarding) no ocupa espacio. */
+.topbar-welcome {
+  padding: 0 18px 14px;
+  margin-top: -2px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-muted);
+  white-space: normal;
+  overflow: visible;
+}
+.topbar-welcome:empty { display: none; padding: 0; margin: 0; }
+
 .icon-btn {
   width: 38px;
   height: 38px;
@@ -581,6 +595,20 @@ button, input, select {
 }
 .day-pill.day-pill-add:active { opacity: .7; }
 
+/* Mantener apretada una pill de dia para arrastrarla y reordenarla: la que
+   se esta arrastrando se agranda y flota un poco, y la que tiene debajo (el
+   lugar donde caeria si soltas) se marca con el color de acento. */
+.day-pill.day-pill-dragging {
+  opacity: .85;
+  transform: scale(1.06);
+  box-shadow: 0 8px 20px -8px rgba(0,0,0,.45);
+  z-index: 2;
+}
+.day-pill.day-pill-dropzone {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 /* Link chico tipo texto (ej. "Asignar dias de la semana"), sin fondo ni
    borde, para acciones secundarias que no necesitan un boton completo. */
 .btn-linklike {
@@ -618,6 +646,48 @@ button, input, select {
 }
 
 .section-title { font-size: 17px; font-weight: 800; margin: 6px 0 12px; }
+
+/* Configuracion: cada seccion arranca colapsada (solo se ve el titulo) y
+   se despliega al tocarlo, para no mostrar todas las opciones de una. */
+details.settings-section { margin: 0 0 4px; }
+details.settings-section summary.section-title {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  margin: 6px 0;
+  padding: 4px 2px;
+}
+details.settings-section summary.section-title::-webkit-details-marker { display: none; }
+details.settings-section summary.section-title::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--text-muted);
+  border-bottom: 2px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform .15s ease;
+  flex-shrink: 0;
+  margin-left: 10px;
+}
+details.settings-section[open] summary.section-title::after { transform: rotate(45deg); }
+details.settings-section .card { margin-top: 0; }
+
+/* Subtitulos internos dentro de un acordeon ya desplegado (ej. dentro de
+   "Mi Perfil": Editar datos, Tus datos; dentro de "Mi Rutina": Objetivo(s),
+   Equipamiento, Dias por semana, etc.) - marcan cada bloque sin ser ellos
+   mismos otro acordeon aparte. */
+.subsection-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--text-muted);
+  margin: 18px 0 8px;
+}
+details.settings-section .subsection-title:first-of-type { margin-top: 14px; }
 
 .link-row {
   display: flex; align-items: center; justify-content: space-between;

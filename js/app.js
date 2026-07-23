@@ -32,7 +32,8 @@ window.addEventListener("unhandledrejection", (e) => {
 
 const STATE = {
   onboardStep: "welcome",
-  onboardData: { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], daysPerWeek: 3, includeMobility: false },
+  onboardData: { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], gymEquipment: [], homeEquipment: [], dayLocations: null, daysPerWeek: 3, includeMobility: false },
+  mixedEquipPhase: null, // "gym" o "home": en que mitad del paso "equipment" estamos cuando location==="mixed"
   previewRoutine: null, // rutina propuesta por el asistente, pendiente de confirmar/ajustar
   onboardAdjustMode: false, // dentro del paso "review": false = viendo la propuesta, true = tildando que sacar
   adjustRemoved: {}, // claves "dayIdx-exIdx" tildadas para sacar en el ajuste post-generacion
@@ -57,6 +58,52 @@ function todayISO() {
 // no le cambiamos la rutina a nadie que ya la tenia armada.
 function mdgymProfileWantsMobility(profile) {
   return profile.includeMobility === undefined ? true : !!profile.includeMobility;
+}
+
+// Perfiles "Mixto" (algunos dias en el gym, otros en casa) no tienen un
+// unico equipo (profile.equipment), sino dos listas por separado
+// (profile.gymEquipment / profile.homeEquipment) y cada dia de la rutina
+// sabe si es "gym" o "home" (profile.routine[i].location). Esta funcion
+// arma, para un perfil dado, la lista de equipo que le corresponde a CADA
+// dia (en el mismo orden que la rutina), lista para pasarle a
+// mdgymBuildRoutine. Para perfiles no-mixtos, devuelve simplemente el
+// equipo unico de siempre (mismo comportamiento que antes de esta feature).
+function mdgymEquipmentPerDayForProfile(profile, dayCount) {
+  if (profile.location !== "mixed") return profile.equipment;
+  const n = dayCount != null ? dayCount : (profile.routine ? profile.routine.length : 0);
+  const perDay = [];
+  for (let i = 0; i < n; i++) {
+    const existing = profile.routine && profile.routine[i];
+    const loc = existing && existing.location ? existing.location : "gym";
+    perDay.push(loc === "home" ? (profile.homeEquipment || []) : (profile.gymEquipment || []));
+  }
+  return perDay;
+}
+
+// Regenera profile.routine (mismo dias/semana, equipo actual, indice de
+// semana actual) y devuelve la rutina nueva, PRESERVANDO por posicion el
+// dia de la semana asignado (weekday) y, en perfiles Mixto, si cada dia es
+// de gym o de casa (location) — sin esto, cada vez que se rota una
+// variante o se cambia el equipo/dias/movilidad, esas asignaciones se
+// perderian silenciosamente porque la rutina se reemplaza por completo.
+function mdgymRegenerateRoutine(profile, includeMobility) {
+  const oldRoutine = profile.routine || [];
+  const locsForBuild = [];
+  for (let i = 0; i < profile.daysPerWeek; i++) {
+    const existing = oldRoutine[i];
+    locsForBuild.push(existing && existing.location ? existing.location : "gym");
+  }
+  const equipmentArg =
+    profile.location === "mixed"
+      ? locsForBuild.map((loc) => (loc === "home" ? (profile.homeEquipment || []) : (profile.gymEquipment || [])))
+      : profile.equipment;
+  const newRoutine = window.mdgymBuildRoutine(profile.daysPerWeek, equipmentArg, profile.weekIndex, includeMobility);
+  newRoutine.forEach((day, i) => {
+    const existing = oldRoutine[i];
+    if (existing && existing.weekday != null) day.weekday = existing.weekday;
+    if (profile.location === "mixed") day.location = locsForBuild[i];
+  });
+  return newRoutine;
 }
 
 function formatDateEs(iso) {
@@ -246,6 +293,7 @@ function el(html) {
 // Router
 // ------------------------------------------------------------
 function showView(name) {
+  mdgymUpdateWelcomeText();
   document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
   const target = document.getElementById("view-" + name);
   if (target) target.classList.add("active");
@@ -277,6 +325,18 @@ function mdgymApplyChromeIcons() {
   if (navHistory) navHistory.innerHTML = window.mdgymIcon("chart", 19);
   const logoSlot = document.getElementById("topbar-logo");
   if (logoSlot) logoSlot.innerHTML = window.mdgymLogo(24);
+}
+
+// Texto de bienvenida debajo del logo ("Bienvenido, {nombre}"). Se
+// actualiza cada vez que se cambia de pantalla (showView) para que
+// siempre refleje el nombre actual del perfil -por ejemplo, si lo
+// cambiaste en Configuracion recien. Antes de tener un perfil (durante el
+// onboarding) no muestra nada.
+function mdgymUpdateWelcomeText() {
+  const el = document.getElementById("topbar-welcome");
+  if (!el) return;
+  const profile = MDGymStore.getProfile();
+  el.textContent = profile && profile.name ? `Bienvenido, ${profile.name}` : "";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -434,6 +494,8 @@ function mdgymBuildRoutineSharePayload(profile) {
     daysPerWeek: profile.daysPerWeek,
     location: profile.location,
     equipment: profile.equipment,
+    gymEquipment: profile.gymEquipment,
+    homeEquipment: profile.homeEquipment,
     goals: profile.goals || [],
     goalScheme: profile.goalScheme,
     routine: profile.routine,
@@ -456,6 +518,8 @@ function mdgymApplySharedRoutineToProfile(sharedData, currentProfile) {
   p.daysPerWeek = sharedData.daysPerWeek;
   p.location = sharedData.location;
   p.equipment = sharedData.equipment || [];
+  p.gymEquipment = sharedData.gymEquipment;
+  p.homeEquipment = sharedData.homeEquipment;
   p.goals = sharedData.goals || [];
   p.goalScheme = sharedData.goalScheme || window.mdgymCombineGoals(sharedData.goals || []);
   p.routine = sharedData.routine;
@@ -482,6 +546,8 @@ function mdgymBuildProfileFromSharedRoutine(personalData, sharedData) {
     location: sharedData.location,
     goals: sharedData.goals || [],
     equipment: sharedData.equipment || [],
+    gymEquipment: sharedData.gymEquipment,
+    homeEquipment: sharedData.homeEquipment,
     daysPerWeek: sharedData.daysPerWeek,
     goalScheme: sharedData.goalScheme || window.mdgymCombineGoals(sharedData.goals || []),
     weekIndex: 0,
@@ -542,11 +608,48 @@ function mdgymReadJsonFile(file, onLoad, onError) {
 // (se resuelve con un click, no con el boton "Continuar"). Los pasos
 // "explain"/"review" (asistente) y "build" (manual) tienen su propio
 // contenido/footer especial dentro de renderOnboarding().
-function mdgymOnboardSteps(mode) {
+// location: "gym" | "home" | "mixed". Cuando es "mixed" (algunos dias en
+// el gym, otros en casa), se agrega el paso "assignlocations" justo
+// despues de "days" -ahi se elige, dia por dia, si "Dia 1", "Dia 2", etc.
+// es de gym o de casa-. El paso "equipment" en si mismo no cambia de
+// nombre ni de posicion en esta lista: cuando la ubicacion es mixta, ese
+// mismo paso se recorre dos veces internamente (equipo de gym y despues
+// equipo de casa, ver STATE.mixedEquipPhase) antes de avanzar al
+// siguiente paso de la lista.
+function mdgymOnboardSteps(mode, location) {
+  const mixed = location === "mixed";
   if (mode === "manual") {
-    return ["mode", "personal", "location", "equipment", "days", "build", "ready"];
+    const steps = ["mode", "personal", "location", "equipment", "days"];
+    if (mixed) steps.push("assignlocations");
+    steps.push("build", "ready");
+    return steps;
   }
-  return ["mode", "personal", "location", "equipment", "goals", "mobility", "days", "explain", "review", "ready"];
+  const steps = ["mode", "personal", "location", "equipment", "goals", "mobility", "days"];
+  if (mixed) steps.push("assignlocations");
+  steps.push("explain", "review", "ready");
+  return steps;
+}
+
+// Durante el paso "equipment", que lista de equipo (dentro de
+// STATE.onboardData) corresponde llenar en este momento: la unica lista
+// de siempre (perfiles no mixtos), o -si es "Mixto"- la de gym o la de
+// casa segun en que mitad del paso estemos (STATE.mixedEquipPhase).
+function mdgymOnboardEquipTargetKey() {
+  if (STATE.onboardData.location === "mixed") {
+    return STATE.mixedEquipPhase === "home" ? "homeEquipment" : "gymEquipment";
+  }
+  return "equipment";
+}
+function mdgymOnboardEquipList() {
+  const key = mdgymOnboardEquipTargetKey();
+  if (!STATE.onboardData[key]) STATE.onboardData[key] = [];
+  return STATE.onboardData[key];
+}
+// Que catalogo de equipo mostrar (filtra maquinas de gimnasio si estamos
+// en la mitad "casa" del paso, igual que ya hacia mdgymEquipmentForLocation).
+function mdgymOnboardEquipCatalogLocation() {
+  if (STATE.onboardData.location === "mixed") return STATE.mixedEquipPhase === "home" ? "home" : "gym";
+  return STATE.onboardData.location;
 }
 
 // En "casa" no mostramos maquinas de gimnasio ni estaciones de polea: solo
@@ -664,12 +767,21 @@ function renderOnboarding() {
   // "manualmente" se muestra la checklist de siempre (mas abajo, dentro
   // del bloque de pasos con footer generico).
   if (step === "equipment" && STATE.equipmentPickMode !== "manual") {
-    const location = STATE.onboardData.location;
+    const location = mdgymOnboardEquipCatalogLocation();
+    const isMixed = STATE.onboardData.location === "mixed";
     const presets = (window.MDGYM_EQUIPMENT_PRESETS && window.MDGYM_EQUIPMENT_PRESETS[location]) || [];
     const manualLabel = location === "home" ? "Elegir lo que tengo, uno por uno" : "Elegir maquina por maquina";
+    const titleText = isMixed
+      ? STATE.mixedEquipPhase === "home"
+        ? "¿Que equipo tenes en tu CASA?"
+        : "¿Que equipo tenes en tu GYM?"
+      : "¿Que equipo tenes?";
+    const subText = isMixed
+      ? "Elegido tu equipo de gym, ahora el de casa (para los dias que entrenas ahi). Elegi un atajo, o segui uno por uno."
+      : "Elegi un atajo, o segui uno por uno si preferis ser especifico.";
     root.innerHTML = `
-      <div class="onboard-title">¿Que equipo tenes?</div>
-      <div class="onboard-sub">Elegi un atajo, o segui uno por uno si preferis ser especifico.</div>
+      <div class="onboard-title">${titleText}</div>
+      <div class="onboard-sub">${subText}</div>
       ${presets
         .map(
           (p) => `
@@ -700,15 +812,25 @@ function renderOnboarding() {
         // "Gimnasio completo" no trae una lista fija: es todo el catalogo
         // disponible para esa ubicacion en este momento.
         const list = preset.equipment || mdgymEquipmentForLocation(location).map((eq) => eq.id);
-        STATE.onboardData.equipment = [...list];
-        const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode);
+        STATE.onboardData[mdgymOnboardEquipTargetKey()] = [...list];
+        if (isMixed && STATE.mixedEquipPhase === "gym") {
+          STATE.mixedEquipPhase = "home";
+          renderOnboarding();
+          return;
+        }
+        const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode, STATE.onboardData.location);
         const idxNow = stepsNow.indexOf("equipment");
         STATE.onboardStep = stepsNow[idxNow + 1];
         renderOnboarding();
       })
     );
     document.getElementById("ob-equip-back").addEventListener("click", () => {
-      const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode);
+      if (isMixed && STATE.mixedEquipPhase === "home") {
+        STATE.mixedEquipPhase = "gym";
+        renderOnboarding();
+        return;
+      }
+      const stepsNow = mdgymOnboardSteps(STATE.onboardData.mode, STATE.onboardData.location);
       const idxNow = stepsNow.indexOf("equipment");
       STATE.onboardStep = stepsNow[idxNow - 1];
       renderOnboarding();
@@ -747,8 +869,8 @@ function renderOnboarding() {
   }
 
   // Pasos con footer generico (Atras / Continuar): personal, location,
-  // equipment, goals, days, explain.
-  const steps = mdgymOnboardSteps(mode);
+  // equipment, goals, days, assignlocations, explain.
+  const steps = mdgymOnboardSteps(mode, STATE.onboardData.location);
   const idx = steps.indexOf(step);
   const progressHtml = `<p class="note" style="text-align:center; margin-top:14px;">Paso ${idx + 1} de ${steps.length}</p>`;
 
@@ -793,19 +915,23 @@ function renderOnboarding() {
       <div class="chip-group" id="location-chips">
         <div class="chip chip-icon ${STATE.onboardData.location === "gym" ? "selected" : ""}" data-location="gym">${window.mdgymIcon("machine", 15)}<span>Gimnasio</span></div>
         <div class="chip chip-icon ${STATE.onboardData.location === "home" ? "selected" : ""}" data-location="home">${window.mdgymIcon("body", 15)}<span>Casa</span></div>
+        <div class="chip chip-icon ${STATE.onboardData.location === "mixed" ? "selected" : ""}" data-location="mixed">${window.mdgymIcon("machine", 15)}${window.mdgymIcon("body", 15)}<span>Mixto</span></div>
       </div>
-      <p class="note">Si elegis "Casa", no te vamos a mostrar maquinas ni estaciones de polea de gimnasio: solo peso corporal, pesas libres, bandas y objetos que puedas tener ahi. Igual vas a poder tildar exactamente que tenes.</p>
+      <p class="note">Si elegis "Casa", no te vamos a mostrar maquinas ni estaciones de polea de gimnasio: solo peso corporal, pesas libres, bandas y objetos que puedas tener ahi. Si elegis "Mixto", vamos a preguntarte el equipo que tenes en el gym Y el que tenes en casa, y despues vos elegis que dias son de cada uno.</p>
     `;
   } else if (step === "equipment") {
-    const catalog = mdgymEquipmentForLocation(STATE.onboardData.location);
+    const equipLocation = mdgymOnboardEquipCatalogLocation();
+    const isMixed = STATE.onboardData.location === "mixed";
+    const equipList = mdgymOnboardEquipList();
+    const catalog = mdgymEquipmentForLocation(equipLocation);
     const groups = {};
     catalog.forEach((eq) => {
       groups[eq.group] = groups[eq.group] || [];
       groups[eq.group].push(eq);
     });
     body = `
-      <div class="onboard-title">¿Que equipo tenes?</div>
-      <div class="onboard-sub">${STATE.onboardData.location === "home" ? "Objetos que tengas en tu casa." : "En tu gym."} Tocá todo lo que tengas disponible.</div>
+      <div class="onboard-title">${isMixed ? (STATE.mixedEquipPhase === "home" ? "¿Que equipo tenes en tu CASA?" : "¿Que equipo tenes en tu GYM?") : "¿Que equipo tenes?"}</div>
+      <div class="onboard-sub">${equipLocation === "home" ? "Objetos que tengas en tu casa." : "En tu gym."} Tocá todo lo que tengas disponible.</div>
       <button type="button" class="btn btn-secondary" id="ob-equip-shortcuts" style="margin-bottom:14px; width:auto; padding:8px 12px; font-size:12.5px;">← Volver a los atajos</button>
       ${Object.keys(groups)
         .map(
@@ -815,7 +941,7 @@ function renderOnboarding() {
           ${groups[gname]
             .map(
               (eq) =>
-                `<div class="chip chip-icon ${STATE.onboardData.equipment.includes(eq.id) ? "selected" : ""}" data-equip="${eq.id}">${window.mdgymIcon(eq.icon, 15)}<span>${eq.label}</span></div>`
+                `<div class="chip chip-icon ${equipList.includes(eq.id) ? "selected" : ""}" data-equip="${eq.id}">${window.mdgymIcon(eq.icon, 15)}<span>${eq.label}</span></div>`
             )
             .join("")}
         </div>`
@@ -855,6 +981,32 @@ function renderOnboarding() {
       </div>
       ${mode === "manual" ? "" : `<p class="note">La cantidad de rutinas posibles es finita: combinamos una plantilla de dia fija (full body, push/pull/legs, etc.) con tu equipo disponible.</p>`}
     `;
+  } else if (step === "assignlocations") {
+    if (!STATE.onboardData.dayLocations || STATE.onboardData.dayLocations.length !== STATE.onboardData.daysPerWeek) {
+      STATE.onboardData.dayLocations = Array.from({ length: STATE.onboardData.daysPerWeek }, () => null);
+    }
+    const locs = STATE.onboardData.dayLocations;
+    const gymCount = locs.filter((l) => l === "gym").length;
+    const homeCount = locs.filter((l) => l === "home").length;
+    body = `
+      <div class="onboard-title">¿Que dias son de gym y cuales de casa?</div>
+      <div class="onboard-sub">Elegido tu equipo de gym y de casa, ahora decidi vos: para cada dia de entreno, si es de gym o de casa.</div>
+      <div id="assign-loc-rows">
+        ${locs
+          .map(
+            (loc, i) => `
+        <div class="assign-weekday-row">
+          <span>Dia ${i + 1}</span>
+          <div class="chip-group" style="margin:0;">
+            <div class="chip chip-icon ${loc === "gym" ? "selected" : ""}" data-locday="${i}" data-locval="gym">${window.mdgymIcon("machine", 14)}<span>Gym</span></div>
+            <div class="chip chip-icon ${loc === "home" ? "selected" : ""}" data-locday="${i}" data-locval="home">${window.mdgymIcon("body", 14)}<span>Casa</span></div>
+          </div>
+        </div>`
+          )
+          .join("")}
+      </div>
+      <p class="note" id="assign-loc-tally">${gymCount} en el gym, ${homeCount} en casa.</p>
+    `;
   } else if (step === "explain") {
     const tempScheme = window.mdgymCombineGoals(STATE.onboardData.goals);
     const fakeProfile = { goals: STATE.onboardData.goals, daysPerWeek: STATE.onboardData.daysPerWeek, goalScheme: tempScheme, includeMobility: !!STATE.onboardData.includeMobility };
@@ -878,8 +1030,24 @@ function renderOnboarding() {
     root.querySelectorAll("[data-location]").forEach((c) =>
       c.addEventListener("click", () => {
         STATE.onboardData.location = c.dataset.location;
+        if (STATE.onboardData.location === "mixed") STATE.mixedEquipPhase = "gym";
         root.querySelectorAll("[data-location]").forEach((x) => x.classList.remove("selected"));
         c.classList.add("selected");
+      })
+    );
+  }
+  if (step === "assignlocations") {
+    root.querySelectorAll("[data-locday]").forEach((c) =>
+      c.addEventListener("click", () => {
+        const dayIdx = Number(c.dataset.locday);
+        STATE.onboardData.dayLocations[dayIdx] = c.dataset.locval;
+        root.querySelectorAll(`[data-locday="${dayIdx}"]`).forEach((x) => x.classList.remove("selected"));
+        c.classList.add("selected");
+        const locs = STATE.onboardData.dayLocations;
+        const gymCount = locs.filter((l) => l === "gym").length;
+        const homeCount = locs.filter((l) => l === "home").length;
+        const tally = document.getElementById("assign-loc-tally");
+        if (tally) tally.textContent = `${gymCount} en el gym, ${homeCount} en casa.`;
       })
     );
   }
@@ -907,9 +1075,10 @@ function renderOnboarding() {
     root.querySelectorAll("[data-equip]").forEach((c) =>
       c.addEventListener("click", () => {
         const id = c.dataset.equip;
-        const i = STATE.onboardData.equipment.indexOf(id);
-        if (i >= 0) STATE.onboardData.equipment.splice(i, 1);
-        else STATE.onboardData.equipment.push(id);
+        const list = mdgymOnboardEquipList();
+        const i = list.indexOf(id);
+        if (i >= 0) list.splice(i, 1);
+        else list.push(id);
         c.classList.toggle("selected");
       })
     );
@@ -933,6 +1102,12 @@ function renderOnboarding() {
 
   const backBtn = document.getElementById("ob-back");
   if (backBtn) backBtn.addEventListener("click", () => {
+    if (step === "equipment" && STATE.onboardData.location === "mixed" && STATE.mixedEquipPhase === "home") {
+      STATE.mixedEquipPhase = "gym";
+      STATE.equipmentPickMode = null;
+      renderOnboarding();
+      return;
+    }
     STATE.onboardStep = steps[idx - 1];
     if (STATE.onboardStep === "equipment") STATE.equipmentPickMode = null;
     // si estabamos completando datos personales para aplicar una rutina
@@ -982,8 +1157,15 @@ function onboardNext() {
       return;
     }
   } else if (step === "equipment") {
-    if (!STATE.onboardData.equipment.length) {
+    const list = mdgymOnboardEquipList();
+    if (!list.length) {
       alert("Marca al menos un equipo disponible (puede ser solo 'Peso corporal').");
+      return;
+    }
+    if (STATE.onboardData.location === "mixed" && STATE.mixedEquipPhase === "gym") {
+      STATE.mixedEquipPhase = "home";
+      STATE.equipmentPickMode = null;
+      renderOnboarding();
       return;
     }
   } else if (step === "goals") {
@@ -992,6 +1174,24 @@ function onboardNext() {
       return;
     }
   } else if (step === "days") {
+    // "Mixto" necesita un paso mas (elegir que dias son gym/casa) antes de
+    // construir o generar la rutina, asi que en ese caso dejamos que el
+    // avance generico de mas abajo nos lleve a "assignlocations".
+    if (mode === "manual" && STATE.onboardData.location !== "mixed") {
+      STATE.manualBuild = {
+        dayIdx: 0,
+        days: Array.from({ length: STATE.onboardData.daysPerWeek }, () => ({ exercises: [] })),
+      };
+      STATE.onboardStep = "build";
+      renderOnboarding();
+      return;
+    }
+  } else if (step === "assignlocations") {
+    const locs = STATE.onboardData.dayLocations || [];
+    if (locs.length !== STATE.onboardData.daysPerWeek || locs.some((l) => !l)) {
+      alert("Elegi gym o casa para cada dia antes de continuar.");
+      return;
+    }
     if (mode === "manual") {
       STATE.manualBuild = {
         dayIdx: 0,
@@ -1002,7 +1202,14 @@ function onboardNext() {
       return;
     }
   } else if (step === "explain") {
-    STATE.previewRoutine = window.mdgymBuildRoutine(STATE.onboardData.daysPerWeek, STATE.onboardData.equipment, 0, STATE.onboardData.includeMobility);
+    const equipmentForBuild =
+      STATE.onboardData.location === "mixed"
+        ? STATE.onboardData.dayLocations.map((loc) => (loc === "home" ? STATE.onboardData.homeEquipment : STATE.onboardData.gymEquipment))
+        : STATE.onboardData.equipment;
+    STATE.previewRoutine = window.mdgymBuildRoutine(STATE.onboardData.daysPerWeek, equipmentForBuild, 0, STATE.onboardData.includeMobility);
+    if (STATE.onboardData.location === "mixed") {
+      STATE.previewRoutine.forEach((day, i) => (day.location = STATE.onboardData.dayLocations[i]));
+    }
     STATE.onboardAdjustMode = false;
     STATE.adjustRemoved = {};
     STATE.onboardStep = "review";
@@ -1010,7 +1217,7 @@ function onboardNext() {
     return;
   }
 
-  const steps = mdgymOnboardSteps(mode);
+  const steps = mdgymOnboardSteps(mode, STATE.onboardData.location);
   const idx = steps.indexOf(step);
   STATE.onboardStep = steps[idx + 1];
   // al llegar de nuevo al paso de equipo (por ejemplo, volviendo desde
@@ -1070,7 +1277,13 @@ function renderOnboardReviewStep(root) {
     day.exercises.forEach((ex, exIdx) => {
       const key = `${dayIdx}-${exIdx}`;
       const marked = !!STATE.adjustRemoved[key];
-      const suggestion = marked ? window.mdgymSuggestSimilar(ex.id, STATE.onboardData.equipment, dayExcludeIds) : null;
+      const dayEquip =
+        STATE.onboardData.location === "mixed"
+          ? STATE.onboardData.dayLocations[dayIdx] === "home"
+            ? STATE.onboardData.homeEquipment
+            : STATE.onboardData.gymEquipment
+          : STATE.onboardData.equipment;
+      const suggestion = marked ? window.mdgymSuggestSimilar(ex.id, dayEquip, dayExcludeIds) : null;
       rows += `
         <div class="link-row" style="cursor:default;">
           <span>${ex.name_es}</span>
@@ -1153,7 +1366,14 @@ function finishOnboardingAssistant() {
     mode: "assistant",
     location: d.location,
     goals: d.goals,
-    equipment: d.equipment,
+    // Para perfiles "Mixto", profile.equipment queda como la UNION de gym +
+    // casa (se usa en pantallas que solo necesitan "que equipo tenes en
+    // total", como el contador de Mi Perfil o la sugerencia de ejercicio
+    // similar). El equipo real que se usa para ARMAR cada dia de la rutina
+    // sale de gymEquipment/homeEquipment + profile.routine[i].location.
+    equipment: d.location === "mixed" ? Array.from(new Set([...(d.gymEquipment || []), ...(d.homeEquipment || [])])) : d.equipment,
+    gymEquipment: d.location === "mixed" ? d.gymEquipment : undefined,
+    homeEquipment: d.location === "mixed" ? d.homeEquipment : undefined,
     daysPerWeek: d.daysPerWeek,
     includeMobility: !!d.includeMobility,
     goalScheme,
@@ -1313,7 +1533,16 @@ function mdgymConfirmUnavailableEquipment(ex, onAddPermanent, onAddOnce) {
 // mdgymExerciseMatchesQuery, para que encuentre el ejercicio sin importar
 // desde que angulo lo busques.
 function openManualExercisePicker(dayIdx) {
-  const equipmentList = STATE.onboardData.equipment;
+  // En perfiles "Mixto", cada dia usa el equipo que corresponda segun si
+  // ese dia es de gym o de casa (STATE.onboardData.dayLocations[dayIdx]);
+  // en perfiles normales, el unico equipo de siempre.
+  const isMixed = STATE.onboardData.location === "mixed";
+  const dayEquipKey = isMixed
+    ? (STATE.onboardData.dayLocations && STATE.onboardData.dayLocations[dayIdx]) === "home"
+      ? "homeEquipment"
+      : "gymEquipment"
+    : "equipment";
+  const equipmentList = STATE.onboardData[dayEquipKey] || [];
   const pool = window.MDGYM_EXERCISES;
   const groups = {};
   pool.forEach((e) => {
@@ -1376,7 +1605,7 @@ function openManualExercisePicker(dayIdx) {
         mdgymConfirmUnavailableEquipment(
           ex,
           () => {
-            if (!STATE.onboardData.equipment.includes(ex.equipment)) STATE.onboardData.equipment.push(ex.equipment);
+            if (!STATE.onboardData[dayEquipKey].includes(ex.equipment)) STATE.onboardData[dayEquipKey].push(ex.equipment);
             doAdd(ex);
           },
           () => doAdd(ex)
@@ -1405,6 +1634,7 @@ function finishOnboardingManual() {
     label: `Dia ${i + 1}`,
     exercises: day.exercises,
     missing: [],
+    location: d.location === "mixed" ? d.dayLocations[i] : undefined,
   }));
 
   const profile = {
@@ -1416,7 +1646,9 @@ function finishOnboardingManual() {
     mode: "manual",
     location: d.location,
     goals: [],
-    equipment: d.equipment,
+    equipment: d.location === "mixed" ? Array.from(new Set([...(d.gymEquipment || []), ...(d.homeEquipment || [])])) : d.equipment,
+    gymEquipment: d.location === "mixed" ? d.gymEquipment : undefined,
+    homeEquipment: d.location === "mixed" ? d.homeEquipment : undefined,
     daysPerWeek: d.daysPerWeek,
     goalScheme: window.mdgymCombineGoals([]),
     weekIndex: 0,
@@ -1480,7 +1712,11 @@ function openRestartModal() {
         location: p.location || null,
         goals: [...(p.goals || [])],
         equipment: [...p.equipment],
+        gymEquipment: p.location === "mixed" ? [...(p.gymEquipment || [])] : undefined,
+        homeEquipment: p.location === "mixed" ? [...(p.homeEquipment || [])] : undefined,
+        dayLocations: p.location === "mixed" ? (p.routine || []).map((d) => d.location || "gym") : undefined,
         daysPerWeek: p.daysPerWeek,
+        includeMobility: !!p.includeMobility,
       };
       // si el perfil actual era manual, prellenamos el constructor con lo
       // que ya tenia armado, para no obligar a rehacerlo todo desde cero.
@@ -1493,6 +1729,7 @@ function openRestartModal() {
         STATE.manualBuild = null;
       }
     }
+    STATE.mixedEquipPhase = null;
     STATE.previewRoutine = null;
     STATE.onboardAdjustMode = false;
     STATE.adjustRemoved = {};
@@ -1503,7 +1740,8 @@ function openRestartModal() {
   });
 
   backdrop.querySelector("#btn-restart-new").addEventListener("click", () => {
-    STATE.onboardData = { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], daysPerWeek: 3 };
+    STATE.onboardData = { name: "", age: "", weightKg: "", heightCm: "", sex: "M", mode: null, location: null, goals: [], equipment: [], gymEquipment: [], homeEquipment: [], dayLocations: null, daysPerWeek: 3 };
+    STATE.mixedEquipPhase = null;
     STATE.previewRoutine = null;
     STATE.onboardAdjustMode = false;
     STATE.adjustRemoved = {};
@@ -1761,6 +1999,7 @@ function renderHome() {
       renderHome();
     })
   );
+  mdgymWireDayPillDrag(root, profile);
 
   document.getElementById("btn-assign-weekdays").addEventListener("click", () => openAssignWeekdaysModal(profile));
   document.getElementById("btn-add-extra-day").addEventListener("click", () => mdgymStartAddExtraDay(profile));
@@ -1872,7 +2111,7 @@ function renderHome() {
     suggestRotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
       p.weekIndex = (p.weekIndex || 0) + 1;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
+      p.routine = mdgymRegenerateRoutine(p, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();
       p.rotationDismissedUntil = null;
@@ -2220,7 +2459,7 @@ function openWeeklyWrapModal() {
       const prof = MDGymStore.getProfile();
       if (!prof) { close(); return; }
       prof.weekIndex = (prof.weekIndex || 0) + 1;
-      prof.routine = window.mdgymBuildRoutine(prof.daysPerWeek, prof.equipment, prof.weekIndex, mdgymProfileWantsMobility(prof));
+      prof.routine = mdgymRegenerateRoutine(prof, mdgymProfileWantsMobility(prof));
       prof.nextDayIndex = 0;
       prof.lastRotationDate = todayISO();
       prof.rotationDismissedUntil = null;
@@ -2304,6 +2543,149 @@ function mdgymExerciseModalVisualHtml(ex) {
 // decidiendo nextDayIndex, como siempre) ni obliga a entrenar ese dia
 // especifico. Sirve para que quede claro, en la propia rutina y en el
 // calendario de Mes, que dia de la semana corresponde a cada numero.
+// ============================================================
+// REORDENAR DIAS DE LA RUTINA (mantener apretado + arrastrar una pill)
+// ============================================================
+// Mueve el dia que estaba en fromIdx a la posicion toIdx. El dia se mueve
+// como objeto completo, asi que todo lo que ya le hayas asignado (el dia
+// de la semana, si tiene gym/casa asignado, sus ejercicios) se va con el a
+// la nueva posicion, tal como pediste. Ademas, como las sesiones ya
+// guardadas y "el proximo dia sugerido" apuntan a un Dia N por NUMERO de
+// posicion (no por un id fijo), recalculamos ese numero para todas las
+// referencias existentes: asi el historial en Mes sigue mostrando "Dia 3"
+// para el entrenamiento que en su momento fue el Dia 3, aunque ahora ese
+// mismo contenido este en otro lugar de la lista.
+function mdgymReorderRoutineDay(profile, fromIdx, toIdx) {
+  const routine = profile.routine;
+  if (fromIdx === toIdx || !routine[fromIdx]) return;
+  toIdx = Math.max(0, Math.min(toIdx, routine.length - 1));
+
+  const oldOrder = routine.slice();
+  const [moved] = routine.splice(fromIdx, 1);
+  routine.splice(toIdx, 0, moved);
+
+  // indexMap[indice viejo] = indice nuevo, para cada dia que ya estaba en
+  // la rutina (calculado por referencia de objeto, no por posicion).
+  const indexMap = {};
+  oldOrder.forEach((day, oldIdx) => {
+    indexMap[oldIdx] = routine.indexOf(day);
+  });
+
+  const sessions = MDGymStore.getSessions();
+  let changedAny = false;
+  sessions.forEach((s) => {
+    if (s.dayIndex != null && indexMap[s.dayIndex] != null && indexMap[s.dayIndex] !== s.dayIndex) {
+      s.dayIndex = indexMap[s.dayIndex];
+      changedAny = true;
+    }
+  });
+  if (changedAny) MDGymStore.saveSessions(sessions);
+
+  if (profile.nextDayIndex != null && indexMap[profile.nextDayIndex] != null) {
+    profile.nextDayIndex = indexMap[profile.nextDayIndex];
+  }
+  if (STATE.viewingDayIndex != null && indexMap[STATE.viewingDayIndex] != null) {
+    STATE.viewingDayIndex = indexMap[STATE.viewingDayIndex];
+  }
+
+  MDGymStore.saveProfile(profile);
+}
+
+// Mantener apretada una pill de dia (~280ms sin soltar ni moverse mucho) y
+// arrastrarla activa el modo "reordenar": la pill que estas por soltar se
+// resalta, y al soltar ese dia pasa a ocupar ese lugar. Un toque normal
+// (sin mantener apretado) sigue funcionando como siempre, para ver ese
+// dia. Usamos Pointer Events porque funcionan igual con mouse y con dedo,
+// sin depender de ninguna libreria.
+function mdgymWireDayPillDrag(root, profile) {
+  const container = root.querySelector(".day-pill-row");
+  if (!container) return;
+  const pills = Array.from(container.querySelectorAll(".day-pill[data-dayidx]"));
+  if (pills.length < 2) return;
+
+  let dragFromIdx = null;
+  let dragPointerId = null;
+  let dragging = false;
+  let longPressTimer = null;
+  let startX = 0;
+  let startY = 0;
+  let hoverIdx = null;
+
+  function clearHighlights() {
+    container.querySelectorAll(".day-pill").forEach((p) => p.classList.remove("day-pill-dropzone"));
+  }
+
+  function endDrag(commit) {
+    clearTimeout(longPressTimer);
+    const wasDragging = dragging;
+    if (wasDragging) {
+      const draggedPill = container.querySelector(`.day-pill[data-dayidx="${dragFromIdx}"]`);
+      if (draggedPill) draggedPill.classList.remove("day-pill-dragging");
+      clearHighlights();
+    }
+    dragging = false;
+    if (wasDragging && commit && hoverIdx != null && hoverIdx !== dragFromIdx) {
+      mdgymReorderRoutineDay(profile, dragFromIdx, hoverIdx);
+      dragFromIdx = null;
+      hoverIdx = null;
+      renderHome();
+      return;
+    }
+    dragFromIdx = null;
+    hoverIdx = null;
+  }
+
+  pills.forEach((pill) => {
+    pill.addEventListener("pointerdown", (e) => {
+      if (e.button != null && e.button !== 0) return;
+      dragFromIdx = Number(pill.dataset.dayidx);
+      dragPointerId = e.pointerId;
+      startX = e.clientX;
+      startY = e.clientY;
+      dragging = false;
+      clearTimeout(longPressTimer);
+      longPressTimer = setTimeout(() => {
+        dragging = true;
+        hoverIdx = dragFromIdx;
+        pill.classList.add("day-pill-dragging");
+        try {
+          pill.setPointerCapture(dragPointerId);
+        } catch (err) {
+          // algunos navegadores viejos no soportan setPointerCapture: no pasa
+          // nada, el drag sigue funcionando, solo sin la captura explicita.
+        }
+      }, 280);
+    });
+
+    pill.addEventListener("pointermove", (e) => {
+      if (dragFromIdx == null) return;
+      const dx = Math.abs(e.clientX - startX);
+      const dy = Math.abs(e.clientY - startY);
+      if (!dragging) {
+        // se movio antes de cumplirse el tiempo de mantener apretado: era
+        // un toque o un scroll horizontal de la fila, no un intento de
+        // arrastrar. Cancelamos silenciosamente.
+        if (dx > 10 || dy > 10) {
+          clearTimeout(longPressTimer);
+          dragFromIdx = null;
+        }
+        return;
+      }
+      e.preventDefault();
+      const overEl = document.elementFromPoint(e.clientX, e.clientY);
+      const overPill = overEl && overEl.closest && overEl.closest(".day-pill[data-dayidx]");
+      clearHighlights();
+      if (overPill) {
+        hoverIdx = Number(overPill.dataset.dayidx);
+        overPill.classList.add("day-pill-dropzone");
+      }
+    });
+
+    pill.addEventListener("pointerup", () => endDrag(true));
+    pill.addEventListener("pointercancel", () => endDrag(false));
+  });
+}
+
 function openAssignWeekdaysModal(profile) {
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
@@ -3513,7 +3895,9 @@ function renderSettings() {
       .join("");
 
     profileSection = `
-      <div class="section-title">Mi Perfil</div>
+      <details class="settings-section">
+      <summary class="section-title">Mi Perfil</summary>
+
       <div class="card">
         <div class="stat-row">
           <div class="stat"><div class="value">${profile.age}</div><div class="label">Años</div></div>
@@ -3528,23 +3912,7 @@ function renderSettings() {
         `}
       </div>
 
-      ${(() => {
-        // Metodo de entrenamiento en el que se basa tu split (segun tus
-        // dias/semana). No aplica a rutinas manuales: esas no siguen una
-        // plantilla de dia, las armaste vos mismo ejercicio por ejercicio.
-        const method = !isManualProfile && window.MDGYM_SPLIT_METHOD ? window.MDGYM_SPLIT_METHOD[profile.daysPerWeek] : null;
-        if (!method) return "";
-        return `
-      <div class="section-title">Metodo de entrenamiento</div>
-      <div class="card">
-        <p class="note" style="margin-top:0; margin-bottom:6px; color:var(--text); font-weight:800;">${method.name}</p>
-        <p class="note" style="margin-top:0;">${method.benefit}</p>
-        <p class="note" style="margin-top:8px;">Es informacion general de entrenamiento de fuerza, no una promesa de resultado: la respuesta varia segun la persona, la alimentacion, el descanso y sobre todo la constancia.</p>
-      </div>
-        `;
-      })()}
-
-      <div class="section-title">Editar datos</div>
+      <div class="subsection-title">Editar datos</div>
       <div class="card">
         <div class="field">
           <label>Nombre</label>
@@ -3566,13 +3934,43 @@ function renderSettings() {
         <button class="btn btn-secondary" id="btn-save-profile">Guardar datos</button>
       </div>
 
+      <div class="subsection-title">Tus datos</div>
+      <div class="card">
+        <p class="note" style="margin-top:0;">MDGym guarda todo (perfil, rutina, historial) solo en este navegador (localStorage). No hay cuenta ni nube: si cambias de dispositivo, borras el cache del sitio, o abris la app desde otra direccion, se pierde. Para no perderlo, exporta un respaldo de vez en cuando y guardalo en algun lugar (ej: tu propio drive); si alguna vez lo perdes, lo recuperas desde ese mismo archivo.</p>
+        <div class="btn-row">
+          <button class="btn btn-secondary" id="btn-export-backup" style="flex:1;">Exportar mis datos</button>
+          <button class="btn btn-secondary" id="btn-import-backup" style="flex:1;">Restaurar desde archivo</button>
+        </div>
+        <input type="file" id="import-backup-file" accept="application/json" style="display:none;" />
+        <button class="btn btn-danger" id="btn-clear-all" style="margin-top:10px;">Borrar todos mis datos</button>
+      </div>
+      </details>
+
+      <details class="settings-section">
+      <summary class="section-title">Mi Rutina</summary>
+
+      ${(() => {
+        // Metodo de entrenamiento en el que se basa tu split (segun tus
+        // dias/semana). No aplica a rutinas manuales: esas no siguen una
+        // plantilla de dia, las armaste vos mismo ejercicio por ejercicio.
+        const method = !isManualProfile && window.MDGYM_SPLIT_METHOD ? window.MDGYM_SPLIT_METHOD[profile.daysPerWeek] : null;
+        if (!method) return "";
+        return `
+      <div class="subsection-title">Metodo de entrenamiento</div>
+      <div class="card">
+        <p class="note" style="margin-top:0; margin-bottom:6px; color:var(--text); font-weight:800;">${method.name}</p>
+        <p class="note" style="margin-top:0;">${method.benefit}</p>
+        <p class="note" style="margin-top:8px;">Es informacion general de entrenamiento de fuerza, no una promesa de resultado: la respuesta varia segun la persona, la alimentacion, el descanso y sobre todo la constancia.</p>
+      </div>
+        `;
+      })()}
+
       ${isManualProfile ? `
-      <div class="section-title">Tu rutina es manual</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Como armaste esta rutina vos mismo, el objetivo, el equipamiento y los dias por semana no se editan desde aca (regenerarian la rutina y perderias lo que armaste). Para sacar o cambiar ejercicios de un dia puntual, andá a Rutina y tocá "Editar ejercicios de este dia". Para rehacerla entera, usá "Volver al inicio" mas abajo.</p>
       </div>
       ` : `
-      <div class="section-title">Objetivo(s)</div>
+      <div class="subsection-title">Objetivo(s)</div>
       <div class="card">
         <div class="chip-group" id="s-goal-chips">
           ${window.MDGYM_GOALS.map((g) => `<div class="chip ${profile.goals.includes(g.id) ? "selected" : ""}" data-sgoal="${g.id}">${g.label}</div>`).join("")}
@@ -3581,15 +3979,22 @@ function renderSettings() {
         <button class="btn btn-secondary" id="btn-save-goals" style="margin-top:10px;">Guardar objetivo(s)</button>
       </div>
 
-      <div class="section-title">Equipamiento</div>
+      ${profile.location === "mixed" ? `
+      <div class="subsection-title">Equipamiento (Mixto)</div>
+      <div class="card">
+        <p class="note" style="margin-top:0;">Tenes equipo configurado por separado: ${(profile.gymEquipment || []).length} items en el gym y ${(profile.homeEquipment || []).length} en casa. Todavia no se puede editar cada lista por separado desde aca -si necesitas cambiarlo, usa "Volver al inicio" mas abajo y elegi Mixto de nuevo-.</p>
+      </div>
+      ` : `
+      <div class="subsection-title">Equipamiento</div>
       <div class="card">
         <div class="chip-group" id="s-equip-chips">
           ${window.MDGYM_EQUIPMENT_CATALOG.map((eq) => `<div class="chip chip-icon ${profile.equipment.includes(eq.id) ? "selected" : ""}" data-sequip="${eq.id}">${window.mdgymIcon(eq.icon, 15)}<span>${eq.label}</span></div>`).join("")}
         </div>
         <button class="btn btn-secondary" id="btn-save-equip" style="margin-top:10px;">Guardar equipamiento y regenerar rutina</button>
       </div>
+      `}
 
-      <div class="section-title">Dias por semana</div>
+      <div class="subsection-title">Dias por semana</div>
       <div class="card">
         <div class="chip-group" id="s-days-chips">
           ${[1, 2, 3, 4, 5, 6].map((n) => `<div class="chip ${profile.daysPerWeek === n ? "selected" : ""}" data-sdays="${n}">${n} dia${n > 1 ? "s" : ""}</div>`).join("")}
@@ -3597,7 +4002,7 @@ function renderSettings() {
         <button class="btn btn-secondary" id="btn-save-days" style="margin-top:10px;">Guardar dias y regenerar rutina</button>
       </div>
 
-      <div class="section-title">Movilidad</div>
+      <div class="subsection-title">Movilidad</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Un par de ejercicios cortos de movilidad articular al principio de cada dia, antes de la parte de fuerza.</p>
         <div class="chip-group" id="s-mobility-chips">
@@ -3607,14 +4012,14 @@ function renderSettings() {
         <button class="btn btn-secondary" id="btn-save-mobility" style="margin-top:10px;">Guardar y regenerar rutina</button>
       </div>
 
-      <div class="section-title">Variedad</div>
+      <div class="subsection-title">Variedad</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Si sentis que se repiten siempre los mismos ejercicios, rotá las variantes disponibles para tu equipo.</p>
         <button class="btn btn-secondary" id="btn-rotate">${window.mdgymIcon("shuffle", 16)} <span>Rotar variantes de ejercicios</span></button>
       </div>
       `}
 
-      <div class="section-title">Compartir rutina</div>
+      <div class="subsection-title">Compartir rutina</div>
       <div class="card">
         <p class="note" style="margin-top:0;">Descarga un archivo con SOLO tu rutina (sin tu nombre, edad, peso ni historial) para pasarsela a otra persona, o abri un archivo que te haya compartido alguien para probar su rutina (reemplaza la tuya; tu historial no se borra).</p>
         <div class="btn-row">
@@ -3623,12 +4028,15 @@ function renderSettings() {
         </div>
         <input type="file" id="import-routine-file" accept="application/json" style="display:none;" />
       </div>
+      </details>
 
-      <div class="section-title">Empezar de nuevo</div>
+      <details class="settings-section">
+      <summary class="section-title">Empezar de nuevo</summary>
       <div class="card">
         <p class="note" style="margin-top:0;">Volve al inicio de todo: podes reusar tus datos actuales para editarlos, o arrancar en blanco. Tu historial de entrenamientos no se borra con esto.</p>
         <button class="btn btn-secondary" id="btn-restart">Volver al inicio</button>
       </div>
+      </details>
     `;
   }
 
@@ -3639,40 +4047,46 @@ function renderSettings() {
       <span style="width:38px;"></span>
     </div>
 
-    <div class="section-title" style="margin-top:4px;">Tema</div>
+    <details class="settings-section" style="margin-top:4px;">
+    <summary class="section-title">Tema</summary>
     <div class="card">
       <div class="theme-grid">${themeSwatches}</div>
     </div>
+    </details>
 
     ${profileSection}
 
-    <div class="section-title">Datos</div>
-    <div class="card">
-      <p class="note" style="margin-top:0;">MDGym guarda todo (perfil, rutina, historial) solo en este navegador (localStorage). No hay cuenta ni nube: si cambias de dispositivo, borras el cache del sitio, o abris la app desde otra direccion, se pierde. Para no perderlo, exporta un respaldo de vez en cuando y guardalo en algun lugar (ej: tu propio drive); si alguna vez lo perdes, lo recuperas desde ese mismo archivo.</p>
-      <div class="btn-row">
-        <button class="btn btn-secondary" id="btn-export-backup" style="flex:1;">Exportar mis datos</button>
-        <button class="btn btn-secondary" id="btn-import-backup" style="flex:1;">Restaurar desde archivo</button>
-      </div>
-      <input type="file" id="import-backup-file" accept="application/json" style="display:none;" />
-      <button class="btn btn-danger" id="btn-clear-all" style="margin-top:10px;">Borrar todos mis datos</button>
-    </div>
-
-    <div class="section-title">Creditos</div>
+    <details class="settings-section">
+    <summary class="section-title">Creditos</summary>
     <div class="card">
       <p class="note" style="margin-top:0;">Los diagramas musculares y las fotos de ejecucion de varios ejercicios vienen de <a href="https://wger.de" target="_blank" rel="noopener">wger.de</a> (API publica), bajo licencia CC-BY-SA 3.0/4.0 o CC0 segun la imagen.</p>
       <button class="btn btn-secondary" id="btn-show-credits">Ver lista completa de atribuciones</button>
     </div>
+    </details>
   `;
 
   document.getElementById("btn-back-settings").addEventListener("click", () => showView("home"));
 
   document.getElementById("btn-show-credits").addEventListener("click", openCreditsModal);
 
+  root.querySelectorAll("[data-theme-choice]").forEach((sw) =>
+    sw.addEventListener("click", () => {
+      const id = sw.dataset.themeChoice;
+      document.documentElement.setAttribute("data-theme", id);
+      const s = MDGymStore.getSettings();
+      s.theme = id;
+      MDGymStore.saveSettings(s);
+      mdgymApplyChromeIcons();
+      renderSettings();
+    })
+  );
+
+  if (!profile) return;
+
+  // "Exportar/restaurar mis datos" ahora vive dentro de Mi Perfil (seccion
+  // profile-gated), asi que este cableado solo se ejecuta cuando esos
+  // botones realmente existen en el DOM (perfil creado).
   document.getElementById("btn-export-backup").addEventListener("click", () => {
-    if (!MDGymStore.getProfile()) {
-      alert("Todavia no hay nada para exportar (no armaste un perfil).");
-      return;
-    }
     mdgymDownloadJson(`mdgym-respaldo-${todayISO()}.json`, mdgymBuildBackupPayload());
   });
 
@@ -3696,20 +4110,6 @@ function renderSettings() {
       (msg) => alert(msg)
     );
   });
-
-  root.querySelectorAll("[data-theme-choice]").forEach((sw) =>
-    sw.addEventListener("click", () => {
-      const id = sw.dataset.themeChoice;
-      document.documentElement.setAttribute("data-theme", id);
-      const s = MDGymStore.getSettings();
-      s.theme = id;
-      MDGymStore.saveSettings(s);
-      mdgymApplyChromeIcons();
-      renderSettings();
-    })
-  );
-
-  if (!profile) return;
 
   const exportRoutineBtn = document.getElementById("btn-export-routine");
   if (exportRoutineBtn) {
@@ -3783,6 +4183,7 @@ function renderSettings() {
     p.weightKg = Number(document.getElementById("s-weight").value) || p.weightKg;
     p.heightCm = Number(document.getElementById("s-height").value) || p.heightCm;
     MDGymStore.saveProfile(p);
+    mdgymUpdateWelcomeText();
     alert("Datos actualizados.");
     renderSettings();
   });
@@ -3809,7 +4210,7 @@ function renderSettings() {
       const selected = Array.from(root.querySelectorAll("[data-sequip].selected")).map((c) => c.dataset.sequip);
       if (!selected.length) { alert("Marca al menos un equipo."); return; }
       p.equipment = selected;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
+      p.routine = mdgymRegenerateRoutine(p, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       MDGymStore.saveProfile(p);
       alert("Equipamiento actualizado y rutina regenerada.");
@@ -3824,7 +4225,7 @@ function renderSettings() {
       const chosen = root.querySelector("[data-sdays].selected");
       if (!chosen) { alert("Elegi cuantos dias por semana."); return; }
       p.daysPerWeek = Number(chosen.dataset.sdays);
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
+      p.routine = mdgymRegenerateRoutine(p, mdgymProfileWantsMobility(p));
       p.nextDayIndex = 0;
       MDGymStore.saveProfile(p);
       alert("Dias actualizados y rutina regenerada.");
@@ -3838,7 +4239,7 @@ function renderSettings() {
       const p = MDGymStore.getProfile();
       const chosen = root.querySelector("[data-smobility].selected");
       p.includeMobility = !chosen || chosen.dataset.smobility === "yes";
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, p.includeMobility);
+      p.routine = mdgymRegenerateRoutine(p, p.includeMobility);
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       MDGymStore.saveProfile(p);
       alert("Preferencia de movilidad actualizada y rutina regenerada.");
@@ -3851,7 +4252,7 @@ function renderSettings() {
     rotateBtn.addEventListener("click", () => {
       const p = MDGymStore.getProfile();
       p.weekIndex = (p.weekIndex || 0) + 1;
-      p.routine = window.mdgymBuildRoutine(p.daysPerWeek, p.equipment, p.weekIndex, mdgymProfileWantsMobility(p));
+      p.routine = mdgymRegenerateRoutine(p, mdgymProfileWantsMobility(p));
       p.nextDayIndex = p.nextDayIndex % p.routine.length;
       p.lastRotationDate = todayISO();
       p.rotationDismissedUntil = null;

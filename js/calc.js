@@ -123,11 +123,17 @@ function mdgymBuildDay(dayTypeKey, equipmentList, weekIndex, includeMobility) {
 }
 
 // Arma la rutina completa (secuencia de dias) segun dias/semana elegidos.
+// equipmentList normalmente es una lista plana de ids de equipo (mismo
+// equipo para todos los dias). Para rutinas "Mixto" (algunos dias en el
+// gym, otros en casa) tambien acepta una lista de listas -una por dia, en
+// el mismo orden que la rutina- para que cada dia use el equipo que le
+// corresponde segun donde se entrena ese dia.
 function mdgymBuildRoutine(daysPerWeek, equipmentList, weekIndex, includeMobility) {
   const sequence = window.MDGYM_SPLIT_BY_DAYS[daysPerWeek] || window.MDGYM_SPLIT_BY_DAYS[3];
+  const perDay = Array.isArray(equipmentList) && Array.isArray(equipmentList[0]);
   return sequence.map((dayType, i) => ({
     dayType,
-    ...mdgymBuildDay(dayType, equipmentList, weekIndex + i, includeMobility),
+    ...mdgymBuildDay(dayType, perDay ? equipmentList[i] || equipmentList[0] || [] : equipmentList, weekIndex + i, includeMobility),
   }));
 }
 
