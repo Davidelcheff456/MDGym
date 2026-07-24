@@ -1634,5 +1634,382 @@ window.MDGYM_EXERCISES = [
    "assets/howto/Cardio_Running_In_Place_0.jpg",
    "assets/howto/Cardio_Running_In_Place_1.jpg"
   ]
+ },
+
+ // ------------------------------------------------------------
+ // Ejercicios sin ningun equipo (solo peso corporal), sumados para dar
+ // mas variedad real a los perfiles "Casa - Ninguno (solo cuerpo)": antes
+ // hombros y biceps no tenian NINGUN ejercicio posible con cero equipo, y
+ // espalda/piernas/triceps tenian muy pocas opciones para rotar. Misma
+ // fuente que el resto del catalogo (free-exercise-db, licencia
+ // Unlicense/dominio publico, sin necesidad de atribucion).
+ // ------------------------------------------------------------
+ {
+  "id": "Handstand_Push-Ups",
+  "name_en": "Handstand Push-Ups",
+  "name_es": "Flexion en Pino (Handstand Push-Up)",
+  "muscle_group": "hombros",
+  "primary_muscle": "shoulders",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "instructions_es": "Apoyado en pino (con los pies contra una pared para mantener el equilibrio), bajá la cabeza hacia el piso de forma controlada flexionando los codos, y empujá para volver a subir. Ejercicio avanzado: requiere buen equilibrio y fuerza de hombro antes de intentarlo.",
+  "howto_images": [
+   "assets/howto/Handstand_Push-Ups_0.jpg",
+   "assets/howto/Handstand_Push-Ups_1.jpg"
+  ]
+ },
+ {
+  "id": "Superman",
+  "name_en": "Superman",
+  "name_es": "Superman",
+  "muscle_group": "espalda",
+  "primary_muscle": "lower back",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca abajo, levantá al mismo tiempo brazos y piernas del piso arqueando la espalda baja de forma controlada, y sostené un segundo antes de bajar.",
+  "howto_images": [
+   "assets/howto/Superman_0.jpg",
+   "assets/howto/Superman_1.jpg"
+  ]
+ },
+ {
+  "id": "Hyperextensions_With_No_Hyperextension_Bench",
+  "name_en": "Hyperextensions With No Hyperextension Bench",
+  "name_es": "Hiperextension Lumbar en el Piso",
+  "muscle_group": "espalda",
+  "primary_muscle": "lower back",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca abajo con las manos detras de la nuca o cruzadas en el pecho, levantá el torso del piso contrayendo la zona lumbar, y bajá de forma controlada. No necesita ningun banco ni apoyo.",
+  "howto_images": [
+   "assets/howto/Hyperextensions_With_No_Hyperextension_Bench_0.jpg",
+   "assets/howto/Hyperextensions_With_No_Hyperextension_Bench_1.jpg"
+  ]
+ },
+ {
+  "id": "Chin-Up",
+  "name_en": "Chin-Up",
+  "name_es": "Dominadas Agarre Supino (Chin-Up)",
+  "muscle_group": "espalda",
+  "primary_muscle": "lats",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "instructions_es": "Colgado de una barra con las palmas mirando hacia vos (agarre supino), tirá hacia arriba hasta que el menton pase la barra, y bajá de forma controlada. El agarre supino suma mas trabajo de biceps que la dominada tradicional.",
+  "howto_images": [
+   "assets/howto/Chin-Up_0.jpg",
+   "assets/howto/Chin-Up_1.jpg"
+  ]
+ },
+ {
+  "id": "Body_Tricep_Press",
+  "name_en": "Body Tricep Press",
+  "name_es": "Press de Triceps Corporal",
+  "muscle_group": "triceps",
+  "primary_muscle": "triceps",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Apoyado en el piso con las manos cerca del cuerpo, extendé los brazos empujando hacia arriba enfocando el trabajo en el triceps, manteniendo los codos cerca del torso.",
+  "howto_images": [
+   "assets/howto/Body_Tricep_Press_0.jpg",
+   "assets/howto/Body_Tricep_Press_1.jpg"
+  ]
+ },
+ {
+  "id": "Standing_Towel_Triceps_Extension",
+  "name_en": "Standing Towel Triceps Extension",
+  "name_es": "Extension de Triceps con Toalla",
+  "muscle_group": "triceps",
+  "primary_muscle": "triceps",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "De pie, sostené una toalla (u otro objeto flexible) detras de la cabeza con ambas manos y extendé los brazos hacia arriba, generando tension con la propia toalla.",
+  "howto_images": [
+   "assets/howto/Standing_Towel_Triceps_Extension_0.jpg",
+   "assets/howto/Standing_Towel_Triceps_Extension_1.jpg"
+  ]
+ },
+ {
+  "id": "Push-Ups_-_Close_Triceps_Position",
+  "name_en": "Push-Ups - Close Triceps Position",
+  "name_es": "Flexiones Cerradas para Triceps",
+  "muscle_group": "triceps",
+  "primary_muscle": "triceps",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "instructions_es": "Flexion de brazos con las manos juntas debajo del pecho formando un triangulo con los dedos, para enfocar el trabajo en el triceps en vez del pecho.",
+  "howto_images": [
+   "assets/howto/Push-Ups_-_Close_Triceps_Position_0.jpg",
+   "assets/howto/Push-Ups_-_Close_Triceps_Position_1.jpg"
+  ]
+ },
+ {
+  "id": "Incline_Push-Up_Close-Grip",
+  "name_en": "Incline Push-Up Close-Grip",
+  "name_es": "Flexiones Inclinadas Cerradas",
+  "muscle_group": "triceps",
+  "primary_muscle": "triceps",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Con las manos apoyadas juntas sobre una superficie elevada (banco, escalon), hacé flexiones enfocando el triceps: mas facil que la version en el piso, buena progresion.",
+  "howto_images": [
+   "assets/howto/Incline_Push-Up_Close-Grip_0.jpg",
+   "assets/howto/Incline_Push-Up_Close-Grip_1.jpg"
+  ]
+ },
+ {
+  "id": "Body-Up",
+  "name_en": "Body-Up",
+  "name_es": "Body-Up (Fondos entre Superficies)",
+  "muscle_group": "triceps",
+  "primary_muscle": "triceps",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "instructions_es": "Apoyado entre dos superficies estables a la misma altura (dos sillas resistentes, por ejemplo), bajá el cuerpo flexionando los codos y empujá hacia arriba, similar a un fondo pero con el cuerpo mas extendido.",
+  "howto_images": [
+   "assets/howto/Body-Up_0.jpg",
+   "assets/howto/Body-Up_1.jpg"
+  ]
+ },
+ {
+  "id": "Incline_Push-Up",
+  "name_en": "Incline Push-Up",
+  "name_es": "Flexiones Inclinadas",
+  "muscle_group": "pecho",
+  "primary_muscle": "chest",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Con las manos apoyadas sobre una superficie elevada (mesa, banco) y los pies en el piso, hacé flexiones: mas facil que la version tradicional, buena progresion para principiantes.",
+  "howto_images": [
+   "assets/howto/Incline_Push-Up_0.jpg",
+   "assets/howto/Incline_Push-Up_1.jpg"
+  ]
+ },
+ {
+  "id": "Push-Up_Wide",
+  "name_en": "Push-Up Wide",
+  "name_es": "Flexiones Abiertas",
+  "muscle_group": "pecho",
+  "primary_muscle": "chest",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Flexion de brazos con las manos apoyadas mas separadas que el ancho de hombros, para sumar enfasis en la parte externa del pecho.",
+  "howto_images": [
+   "assets/howto/Push-Up_Wide_0.jpg",
+   "assets/howto/Push-Up_Wide_1.jpg"
+  ]
+ },
+ {
+  "id": "Butt_Lift_Bridge",
+  "name_en": "Butt Lift (Bridge)",
+  "name_es": "Puente de Gluteos",
+  "muscle_group": "piernas",
+  "primary_muscle": "glutes",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca arriba con las rodillas flexionadas y los pies apoyados, empujá la cadera hacia arriba contrayendo los gluteos, sostené un segundo arriba y bajá de forma controlada.",
+  "howto_images": [
+   "assets/howto/Butt_Lift_Bridge_0.jpg",
+   "assets/howto/Butt_Lift_Bridge_1.jpg"
+  ]
+ },
+ {
+  "id": "Glute_Kickback",
+  "name_en": "Glute Kickback",
+  "name_es": "Patada de Gluteo",
+  "muscle_group": "piernas",
+  "primary_muscle": "glutes",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "En cuatro apoyos, extendé una pierna hacia atras y arriba contrayendo el gluteo, sin arquear la espalda baja. Alterná de lado.",
+  "howto_images": [
+   "assets/howto/Glute_Kickback_0.jpg",
+   "assets/howto/Glute_Kickback_1.jpg"
+  ]
+ },
+ {
+  "id": "Step-up_with_Knee_Raise",
+  "name_en": "Step-up with Knee Raise",
+  "name_es": "Step-up con Elevacion de Rodilla",
+  "muscle_group": "piernas",
+  "primary_muscle": "glutes",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Subí a un escalon o superficie estable con una pierna, llevando la rodilla contraria hacia el pecho arriba, y bajá de forma controlada. Alterná de lado.",
+  "howto_images": [
+   "assets/howto/Step-up_with_Knee_Raise_0.jpg",
+   "assets/howto/Step-up_with_Knee_Raise_1.jpg"
+  ]
+ },
+ {
+  "id": "Reverse_Crunch",
+  "name_en": "Reverse Crunch",
+  "name_es": "Crunch Invertido",
+  "muscle_group": "abdominales",
+  "primary_muscle": "abdominals",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca arriba, llevá las rodillas hacia el pecho levantando la cadera del piso, de forma controlada, sin usar impulso.",
+  "howto_images": [
+   "assets/howto/Reverse_Crunch_0.jpg",
+   "assets/howto/Reverse_Crunch_1.jpg"
+  ]
+ },
+ {
+  "id": "Side_Bridge",
+  "name_en": "Side Bridge",
+  "name_es": "Plancha Lateral",
+  "muscle_group": "abdominales",
+  "primary_muscle": "abdominals",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "De costado, apoyado en el antebrazo y el borde del pie, mantené el cuerpo alineado sin dejar caer la cadera. Alterná de lado.",
+  "howto_images": [
+   "assets/howto/Side_Bridge_0.jpg",
+   "assets/howto/Side_Bridge_1.jpg"
+  ]
+ },
+ {
+  "id": "Dead_Bug",
+  "name_en": "Dead Bug",
+  "name_es": "Dead Bug",
+  "muscle_group": "abdominales",
+  "primary_muscle": "abdominals",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca arriba con brazos y piernas arriba en 90 grados, extendé un brazo y la pierna contraria al mismo tiempo sin despegar la espalda baja del piso, y volvé. Alterná de lado.",
+  "howto_images": [
+   "assets/howto/Dead_Bug_0.jpg",
+   "assets/howto/Dead_Bug_1.jpg"
+  ]
+ },
+ {
+  "id": "Flutter_Kicks",
+  "name_en": "Flutter Kicks",
+  "name_es": "Patada de Tijera (Flutter Kicks)",
+  "muscle_group": "abdominales",
+  "primary_muscle": "abdominals",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca arriba con la espalda baja pegada al piso, levantá ligeramente las piernas y alterná pataditas cortas, como nadando.",
+  "howto_images": [
+   "assets/howto/Flutter_Kicks_0.jpg",
+   "assets/howto/Flutter_Kicks_1.jpg"
+  ]
+ },
+ {
+  "id": "Bottoms_Up",
+  "name_en": "Bottoms Up",
+  "name_es": "Bottoms Up",
+  "muscle_group": "abdominales",
+  "primary_muscle": "abdominals",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "isolation",
+  "instructions_es": "Acostado boca arriba con las piernas extendidas hacia arriba, levantá la cadera del piso llevando los pies hacia el techo, de forma controlada.",
+  "howto_images": [
+   "assets/howto/Bottoms_Up_0.jpg",
+   "assets/howto/Bottoms_Up_1.jpg"
+  ]
+ },
+ {
+  "id": "Fast_Skipping",
+  "name_en": "Fast Skipping",
+  "name_es": "Saltar la Soga sin Soga (Fast Skipping)",
+  "muscle_group": "cardio",
+  "primary_muscle": "cardio_legs",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Simulá el salto de la soga sin necesitarla: saltos rapidos y livianos alternando los pies, con un ritmo constante.",
+  "howto_images": [
+   "assets/howto/Fast_Skipping_0.jpg",
+   "assets/howto/Fast_Skipping_1.jpg"
+  ]
+ },
+ {
+  "id": "Star_Jump",
+  "name_en": "Star Jump",
+  "name_es": "Salto de Estrella (Star Jump)",
+  "muscle_group": "cardio",
+  "primary_muscle": "cardio_full_body",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Desde en cuclillas, saltá abriendo brazos y piernas en el aire como una estrella, y aterrizá suave volviendo a la posicion inicial.",
+  "howto_images": [
+   "assets/howto/Star_Jump_0.jpg",
+   "assets/howto/Star_Jump_1.jpg"
+  ]
+ },
+ {
+  "id": "Split_Jump",
+  "name_en": "Split Jump",
+  "name_es": "Salto Alternado de Piernas (Split Jump)",
+  "muscle_group": "cardio",
+  "primary_muscle": "cardio_legs",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "intermediate",
+  "mechanic": "compound",
+  "instructions_es": "Desde una posicion de zancada, saltá alternando la pierna de adelante en el aire, aterrizando en zancada con la otra pierna adelante.",
+  "howto_images": [
+   "assets/howto/Split_Jump_0.jpg",
+   "assets/howto/Split_Jump_1.jpg"
+  ]
+ },
+ {
+  "id": "Mobility_Groiners",
+  "name_en": "Groiners",
+  "name_es": "Estiramiento Dinamico de Cadera (Groiners)",
+  "muscle_group": "movilidad",
+  "primary_muscle": "hips_mobility",
+  "equipment": "body only",
+  "equipment_es": "Peso corporal",
+  "level": "beginner",
+  "mechanic": "compound",
+  "instructions_es": "Desde una posicion de plancha, llevá un pie hacia afuera de la mano del mismo lado en un paso largo, sintiendo el estiramiento en la cadera, y volvé. Alterná de lado.",
+  "howto_images": [
+   "assets/howto/Groiners_0.jpg",
+   "assets/howto/Groiners_1.jpg"
+  ]
  }
 ];

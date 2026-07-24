@@ -10,7 +10,7 @@ registrar el peso usado en cada ejercicio dia a dia.
   rutina y el historial se guardan con `localStorage` en el dispositivo/navegador
   donde lo uses. Si cambias de celular/PC o borras el cache del sitio, se pierde
   ese historial (no hay sincronizacion en la nube en esta version).
-- La base de ~93 ejercicios (nombre, musculo, equipo especifico, instrucciones)
+- La base de 116 ejercicios (nombre, musculo, equipo especifico, instrucciones)
   viene originalmente del dataset publico [free-exercise-db](https://github.com/yuhonas/free-exercise-db)
   (licencia Unlicense / dominio publico); los nombres en espanol, el equipo
   detallado (maquina por maquina) y las instrucciones fueron redactados a mano.
@@ -19,7 +19,7 @@ registrar el peso usado en cada ejercicio dia a dia.
   [wger.de](https://wger.de), licencia CC-BY-SA 3.0/4.0 o CC0 segun la imagen).
   Los de movilidad y cardio no tienen un musculo puntual, asi que en su lugar
   usan directamente su propia foto real de ejecucion como imagen principal.
-  En total, los ~93 ejercicios tienen fotos reales de ejecucion, tomadas de
+  En total, los 116 ejercicios tienen fotos reales de ejecucion, tomadas de
   wger.de, de free-exercise-db o (para Burpees, el unico caso sin coincidencia
   confiable en esas dos) de [Pexels](https://www.pexels.com) — ver el detalle
   completo de autores y licencias abajo, y dentro de la app en Configuracion →
@@ -95,7 +95,7 @@ MDGym/
   js/calc.js                -> calculos (IMC, masa magra estimada) + generador de rutina
   js/app.js                 -> logica de la app y render de cada pantalla
   assets/muscles/           -> 8 diagramas musculares (silueta + musculo resaltado), wger.de
-  assets/howto/             -> fotos reales de ejecucion para 30 ejercicios, wger.de
+  assets/howto/             -> fotos reales de ejecucion para los 116 ejercicios, wger.de + free-exercise-db
 ```
 
 ## Atribuciones e imagenes
@@ -113,9 +113,16 @@ muevas de lugar, ya viene incluida).
 
 ## Cosas para mejorar mas adelante (quedaron fuera del alcance inicial)
 
-- Cobertura de ejercicios sin ningun equipo (solo "Peso corporal") es limitada
-  para hombros y biceps: la app te avisa cuando falta un ejercicio para algun
-  musculo y te sugiere sumar "Objetos varios" (mochila, botellas, etc.).
+- Cobertura de ejercicios sin ningun equipo (solo "Peso corporal"): se sumaron
+  23 ejercicios nuevos para dar mas variedad a hombros, espalda, pecho,
+  triceps, piernas, abdominales, cardio y movilidad. Biceps sigue sin ningun
+  ejercicio 100% sin equipo: no existe una forma real de aislar biceps con
+  peso corporal puro (el curl de biceps necesita resistencia externa); las
+  dominadas con agarre supino ("Chin-Up", catalogadas en espalda) trabajan
+  biceps como musculo secundario y son la mejor alternativa sin comprar nada,
+  pero para un ejercicio dedicado a biceps hace falta al menos una banda
+  elastica. La app te avisa cuando falta un ejercicio para algun musculo y te
+  sugiere sumar "Objetos varios" (mochila, botellas, etc.) o una banda.
 - No hay cuenta ni respaldo en la nube: si queres pasar tu historial a otro
   dispositivo, por ahora no hay forma automatica (se podria agregar un
   exportar/importar `.json` mas adelante).
