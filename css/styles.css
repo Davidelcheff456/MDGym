@@ -216,7 +216,10 @@ button, input, select {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 22px;
+  line-height: 1;
+  padding: 0;
+  color: var(--text);
 }
 .icon-btn:active { transform: scale(.94); }
 
@@ -661,7 +664,8 @@ button, input, select {
   cursor: pointer;
   text-align: left;
   color: var(--text);
-  font: inherit;
+  font-size: 18px;
+  font-weight: 800;
 }
 .day-title-toggle:active { opacity: .75; }
 .day-title-toggle-chevron {

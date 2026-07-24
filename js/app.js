@@ -1938,7 +1938,7 @@ function renderHome() {
         : `<div class="suggest-card"><p>Sacaste "${STATE.homeSuggestion.removedName}" y no encontramos una alternativa con tu equipamiento actual para ese musculo.</p></div>`
       : "";
 
-  const editToggleHtml = `<button class="btn btn-secondary" id="btn-toggle-edit" style="margin:12px 0 4px;">${isEditingDay ? "Listo" : "Editar ejercicios de este dia"}</button>`;
+  const editToggleHtml = `<button class="btn btn-secondary" id="btn-toggle-edit" style="margin:12px 0 4px; font-size:17px; font-weight:800;">${isEditingDay ? "Listo" : "Editar ejercicios de este dia"}</button>`;
   const addExerciseHtml = isEditingDay
     ? `<button class="btn btn-secondary" id="btn-add-exercise" style="margin:10px 0 4px;">+ Agregar ejercicio</button>`
     : "";
@@ -1975,9 +1975,9 @@ function renderHome() {
       ${weekMotivationHtml}
       ${suggestRotateHtml}
       ${missingNote}
+      ${editToggleHtml}
     </div>
     <div id="day-motivation"></div>
-    ${editToggleHtml}
     ${homeSuggestionHtml}
     ${exCards}
     ${addExerciseHtml}
@@ -2009,6 +2009,11 @@ function renderHome() {
       const toggle = document.getElementById("day-title-toggle");
       if (!panel || !panel.classList.contains("open")) return;
       if (panel.contains(e.target) || (toggle && toggle.contains(e.target))) return;
+      // Mientras se estan sacando ejercicios del dia (STATE.editingDayIdx
+      // != null), el panel tiene que seguir visible aunque se toque afuera
+      // (por ejemplo al tocar una tarjeta de ejercicio para sacarla), para
+      // que el boton "Listo" siga a mano. Se cierra recien al tocar "Listo".
+      if (STATE.editingDayIdx !== null) return;
       panel.classList.remove("open");
       if (toggle) toggle.classList.remove("open");
       STATE.dayInfoOpenForDay = null;
@@ -2108,6 +2113,10 @@ function renderHome() {
   document.getElementById("btn-toggle-edit").addEventListener("click", () => {
     STATE.editingDayIdx = isEditingDay ? null : dayIdx;
     STATE.homeSuggestion = null;
+    // Al empezar a editar, el panel de info (donde vive este boton) tiene
+    // que quedar abierto durante toda la edicion. Al tocar "Listo", se
+    // cierra junto con el modo edicion.
+    STATE.dayInfoOpenForDay = isEditingDay ? null : dayIdx;
     renderHome();
   });
   if (isEditingDay) {
@@ -4086,7 +4095,7 @@ function renderSettings() {
 
   root.innerHTML = `
     <div class="topbar" style="padding-left:0; padding-right:0;">
-      <button class="icon-btn" id="btn-back-settings">←</button>
+      <button class="icon-btn" id="btn-back-settings" aria-label="Volver">${window.mdgymIcon("arrowLeft", 20)}</button>
       <h1>Configuracion</h1>
       <span style="width:38px;"></span>
     </div>
